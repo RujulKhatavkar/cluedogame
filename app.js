@@ -62,6 +62,7 @@ io.on('connection', (socket) => {
       console.log('playerinroom' ,playersInRoom)
       console.log('playerName',playerNames)
       currentTurn = 1;
+      turn = 1
 
       // Send player names to the client
       io.to(uid).emit('playerNames', playerNames);
@@ -73,16 +74,11 @@ io.on('connection', (socket) => {
 
 playersInRoom.forEach((player, index) => {
   io.to(player.id).emit('receiveCards', { playerNameIndivisual: player.name, cards: cards[`Player${index + 1}`] });
-  console.log('individual card', cards[`Player${index + 1}`]);
+  // console.log('individual card', cards[`Player${index + 1}`]);
 });
 
 
       io.to(uid).emit('hideJoinButton');
-
-      console.log('Game started with players:', playerNames);
-      console.log('Card distribution:', cards);
-
-      // You can add additional logic here to handle the game start
     }
   });
   function sendPromptToNextPlayer(uid, assumption) {
@@ -92,6 +88,7 @@ playersInRoom.forEach((player, index) => {
     console.log(currentPlayerIndex)
     // const turn2 = (currentPlayerIndex + 1) % playersInRoom.length;
     if ((typeof turn2 === 'undefined')){
+      console.log('I am here')
        turn2 = (currentPlayerIndex)
     }
     console.log('innerturn',turn2)
@@ -169,7 +166,7 @@ socket.on('playerResponse', (uid, response) => {
       // Get the ID of the player whose turn it is
         const currentPlayerId = playersInRoom[currentPlayerIndex].id;
         if ((typeof firstNonSkipCard === 'undefined')){
-          console.log('yes')
+          // console.log('yes')
            firstNonSkipCard = 'undefined';
            playerName = 'No one'
         }
@@ -179,7 +176,7 @@ socket.on('playerResponse', (uid, response) => {
         io.to(uid).emit('playerResponseAll',{playerName});
 
       turn = (turn % playersInRoom.length) + 1;
-      console.log(deactivatedPlayers.includes(playersInRoom[nextIndex].name))
+      // console.log(deactivatedPlayers.includes(playersInRoom[nextIndex].name))
       if (deactivatedPlayers.includes(playersInRoom[nextIndex].name)) {
           turn = (turn % playersInRoom.length) + 1;
       }
