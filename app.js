@@ -162,7 +162,6 @@ socket.on('playerResponse', (uid, response) => {
          playerName = firstNonSkipCardResponse.playerName;
          firstNonSkipCard = firstNonSkipCardResponse.selectedCards[0];
       }
-      console.log(firstNonSkipCard)
         const currentPlayerIndex = turn - 1; //turn =2,cpi=1
         let nextIndex = (currentPlayerIndex+1) % playersInRoom.length;//ni=2
 
