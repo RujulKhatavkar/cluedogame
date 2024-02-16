@@ -67,6 +67,7 @@ io.on('connection', (socket) => {
       io.to(uid).emit('playerNames', playerNames);
       io.to(uid).emit('updateTurn', { turn, playerName: playersInRoom[turn - 1].name, uid }); // Pass uid here
       console.log(turn)
+      turn2 = undefined;
       // Distribute cards
        const cards = distributeCards(uid, playersInRoom.length);
 

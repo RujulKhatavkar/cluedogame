@@ -27,6 +27,7 @@ document.getElementById('joinRoomBtn').addEventListener('click', () => {
     socket.emit('joinRoom', uid);
     document.getElementById('createRoomBtn').classList.add('hidden');
     document.getElementById('startGameBtn').classList.add('hidden');
+    document.getElementById('joinRoomBtn').classList.add('hidden');
   } else {
     console.error('Invalid UID entered.');
   }
