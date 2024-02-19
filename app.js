@@ -1,23 +1,30 @@
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
+const path = require('path');
+
+
+
 
 const app = express();
+app.use(express.static('__dirname'));
 const server = http.createServer(app);
 const io = socketIO(server);
 
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
+// Define a route to serve your HTML file
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
 
 const rooms = {};
 const players = {};
 let turn =1
 
 let promptResponsesCounter = 0;
-const suspects = ["Miss Scarlett", "Colonel Mustard", "Mrs. White", "Mr. Green", "Mrs. Peacock", "Professor Plum"];
+const suspects = ["Miss Scarlett", "Colonel Mustard", "Mr. White", "Dr. Green", "Mrs. Peacock", "Professor Plum"];
 const weapons = ["Candlestick", "Dagger", "Lead Pipe", "Revolver", "Rope", "Wrench"];
 const gameRooms = ["Kitchen", "Ballroom", "Conservatory", "Dining Room", "Billiard Room", "Library", "Lounge", "Hall", "Study"];
 let responses = [];
@@ -124,21 +131,7 @@ playersInRoom.forEach((player, index) => {
       }
   });
 
-  // Modify the 'nextTurn' event handler to properly update the turn and emit 'updateTurn'
-  socket.on('nextTurn', (uid, selectedCards) => {
-      if (rooms[uid]) {
-          const playersInRoom = rooms[uid];
-          console.log('Received next turn request from client.');
 
-          // Update the turn
-          turn = (turn % playersInRoom.length) + 1;
-          io.to(uid).emit('updateTurn', { turn, playerName: playersInRoom[turn - 1].name, selectedCards });
-          console.log('Updated turn:', turn);
-      } else {
-          // If room is not found, emit an error event
-          socket.emit('updateTurnError', 'Room not found.');
-      }
-  });
 
 socket.on('playerResponse', (uid, response) => {
   if (rooms[uid]) {
@@ -217,7 +210,7 @@ socket.on('checkGuess',(uid, response)=>{
       deactivatedPlayers.push(response.playerNameIndivisual)
       console.log(turn)
         turn = (turn % playersInRoom.length) + 1;
-        console.log(turn)
+      io.to(uid).emit("loser",{playerName:response.playerNameIndivisual})
       io.to(uid).emit('updateTurn', { turn, playerName: playersInRoom[turn - 1].name});
     }
 

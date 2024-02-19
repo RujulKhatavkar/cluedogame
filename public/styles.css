@@ -125,20 +125,38 @@ button:disabled {
 
 /* Card styles */
 .card {
-  width: 150px;
+  /* width: 150px; */
   height: 200px;
-  border: 1px solid #ccc;
+  /* border: 1px solid #ccc; */
+  display:flex;
   border-radius: 8px;
   margin: 10px;
   padding: 10px;
-  box-sizing: border-box;
+  /* box-sizing: border-box; */
 }
 
-.card-title {
-  font-weight: bold;
-  margin-bottom: 5px;
+/* Add CSS to style the cards container */
+#cardsContainer {
+  display: flex; /* Ensure cards are displayed horizontally */
+  flex-wrap: wrap; /* Allow cards to wrap to the next line when there's not enough space */
+  gap: 10px; /* Add some space between cards */
 }
 
-.card-content {
-  font-size: 14px;
+/* Add CSS to style the player cards table */
+#playerCardsTable {
+  margin-top: 20px; /* Add some space between the cards container and the table */
+  border-collapse: collapse; /* Collapse table borders */
+}
+
+#playerCardsTable th, #playerCardsTable td {
+  padding: 8px 16px; /* Add padding to table cells */
+  border: 1px solid #ddd; /* Add borders to table cells */
+}
+
+#playerCardsTable th {
+  background-color: #f2f2f2; /* Add background color to table header cells */
+}
+
+#playerCardsTable td {
+  text-align: center; /* Center-align table cell content */
 }

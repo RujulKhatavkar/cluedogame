@@ -2,7 +2,7 @@ const socket = io();
 
 let playerNames;
 let cards;
-const suspects = ["Miss Scarlett", "Colonel Mustard", "Mrs. White", "Mr. Green", "Mrs. Peacock", "Professor Plum"];
+const suspects = ["Miss Scarlett", "Colonel Mustard", "Mr. White", "Dr. Green", "Mrs. Peacock", "Professor Plum"];
 const weapons = ["Candlestick", "Dagger", "Lead Pipe", "Revolver", "Rope", "Wrench"];
 const gameRooms = ["Kitchen", "Ballroom", "Conservatory", "Dining Room", "Billiard Room", "Library", "Lounge", "Hall", "Study"];
 let uid; // Declare uid here
@@ -28,6 +28,9 @@ document.getElementById('joinRoomBtn').addEventListener('click', () => {
     document.getElementById('createRoomBtn').classList.add('hidden');
     document.getElementById('startGameBtn').classList.add('hidden');
     document.getElementById('joinRoomBtn').classList.add('hidden');
+
+    document.getElementById('joiningMessage').classList.remove('hidden');
+
   } else {
     console.error('Invalid UID entered.');
   }
@@ -55,30 +58,42 @@ socket.on('receiveCards', (data) => {
   playerCards.innerText = cards;
   // console.log(allCardNames);
   createDynamicTable(allCardNames, playerNames);
-   createCards(cards);
-  // You can add logic here to display the cards on the client side
+  createCards(cards);
+
 });
 
 function createCards(cards) {
   const cardsContainer = document.getElementById('cardsContainer');
-  cardsContainer.innerHTML = ''; // Clear previous cards
+  cardsContainer.innerHTML = '';
 
-  cards.forEach(card => {
-    const cardElement = document.createElement('div');
-    cardElement.classList.add('card');
+  let row = document.createElement('div');
+  row.classList.add('card');
+  cardsContainer.style.display = 'flex';
 
-    const cardTitle = document.createElement('h3');
-    cardTitle.classList.add('card-title');
-    cardTitle.textContent = card;
+  // Create and append card elements
+  cards.forEach((card, index) => {
+    // const cardElement = document.createElement('div');
+    // cardElement.classList.add('card');
+    const cardImage = document.createElement('img');
+    cardImage.classList.add('card')
+    cardImage.classList.add('card-image');
+    cardImage.src = `C:/Users/rujul/Documents/multiplayer-game-starter-main/public/js/images/${card}.jpg`;
+    cardImage.src = `js/images/${card}.jpg`; // Replace 'path/to/' with the actual path to your images
+    cardImage.alt = card;
 
-    const cardContent = document.createElement('p');
-    cardContent.classList.add('card-content');
-    cardContent.textContent = 'Card description goes here...'; // You can replace this with actual card description
 
-    cardElement.appendChild(cardTitle);
-    cardElement.appendChild(cardContent);
 
-    cardsContainer.appendChild(cardElement);
+    // cardElement.appendChild(cardImage);
+    // cardElement.appendChild(cardContent);
+
+    row.appendChild(cardImage);
+
+    // Create a new row after every four cards or if it's the last card
+    // if ((index + 1) % 4 === 0 || index === cards.length - 1) {
+      cardsContainer.appendChild(row);
+      // row = document.createElement('div');
+      // row.classList.add('card-row');
+    // }
   });
 }
 
@@ -112,6 +127,8 @@ socket.on('hideJoinButton', () => {
   document.getElementById('joinRoomBtn').classList.add('hidden');
   document.getElementById('createRoomBtn').classList.add('hidden');
   document.getElementById('startGameBtn').classList.add('hidden');
+  document.getElementById('joiningMessage').classList.add('hidden');
+
 if (gameUid){
   gameUid.innerHTML = ''
 }
@@ -157,6 +174,7 @@ function createDynamicTable(playerNames, allcardNames) {
   table.border = "1";
 
   // Create header row with player names
+  let previousType = '';
   const headerRow = document.createElement('tr');
   headerRow.innerHTML = '<th>Card Names</th>' + allcardNames.map(cardName => `<th>${cardName}</th>`).join('');
   table.appendChild(headerRow);
@@ -164,7 +182,13 @@ function createDynamicTable(playerNames, allcardNames) {
   // Create rows for each card
   playerNames.forEach((playerName) => {
     const row = document.createElement('tr');
-    row.innerHTML = `<td>${playerName}</td>` + allcardNames.map(() => '<td></td>').join('');
+    row.innerHTML = `<td>${playerName}</td>` + allcardNames.map((cardName, index) => {
+      // Check if the current card belongs to a new group
+      const currentType = index < suspects.length ? 'suspect' : index < suspects.length + weapons.length ? 'weapon' : 'room';
+      const boldLine = previousType !== '' && currentType !== previousType ? '<td><strong>---</strong></td>' : '';
+      previousType = currentType;
+      return boldLine + '<td></td>';
+    }).join('');
     table.appendChild(row);
   });
 }
@@ -267,6 +291,7 @@ socket.on('updateTurn', (data) => {
 
   document.getElementById('nextTurnBtn').classList.remove('hidden');
   document.getElementById('final').classList.remove('hidden');
+  window.scrollTo(0, document.body.scrollHeight);
 
 }
   else {
@@ -374,6 +399,8 @@ socket.on('promptPlayer', (prompt) => {
 
   // Append the checkbox container to the document body
   document.body.appendChild(checkboxContainer);
+  window.scrollTo(0, document.body.scrollHeight);
+
 
   // Add event listeners to radio buttons to enable submit button when checked
   const radioButtons = document.querySelectorAll('input[type="radio"]');
@@ -410,6 +437,8 @@ socket.on('playerResponse', (data) => {
 
 document.getElementById('final').addEventListener('click', () => {
   console.log("clicked me")
+  finalGuess = prompt('Enter the word "guess" if you want to check the answer. Please note the you will be an inactive player if the assumptions are incorrect');
+  if (finalGuess =='guess'){
   const suspectDropdown = document.getElementById('suspects');
   const weaponDropdown = document.getElementById('weapons');
   const roomDropdown = document.getElementById('gameRooms');
@@ -426,11 +455,19 @@ document.getElementById('final').addEventListener('click', () => {
   console.log(answer)
 
 socket.emit('checkGuess', uid, { playerNameIndivisual, answer });
+}
 });
 
 socket.on('winner',(data)=>{
   console.log(data)
   alert(`${data.playerName} won the game`)
     document.getElementById('game').classList.add('hidden');
+
+})
+
+
+socket.on('loser',(data)=>{
+  console.log(data)
+  alert(`${data.playerName}guessed incorrectly, they will not be given a chance to guess again`)
 
 })
