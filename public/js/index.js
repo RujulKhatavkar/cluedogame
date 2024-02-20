@@ -69,34 +69,36 @@ function createCards(cards) {
   let row = document.createElement('div');
   row.classList.add('card');
   cardsContainer.style.display = 'flex';
+  cardsContainer.style.display = 'grid';
+ cardsContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))'; // Adjust the min and max width as needed
+ cardsContainer.style.gap = '20px'; // Adjust the gap between cards as needed
+
 
   // Create and append card elements
+
   cards.forEach((card, index) => {
-    // const cardElement = document.createElement('div');
-    // cardElement.classList.add('card');
+
     const cardImage = document.createElement('img');
-    cardImage.classList.add('card')
+    // cardImage.classList.add('card')
     cardImage.classList.add('card-image');
     cardImage.src = `C:/Users/rujul/Documents/multiplayer-game-starter-main/public/js/images/${card}.jpg`;
     cardImage.src = `js/images/${card}.jpg`; // Replace 'path/to/' with the actual path to your images
     cardImage.alt = card;
 
-
-
-    // cardElement.appendChild(cardImage);
-    // cardElement.appendChild(cardContent);
-
     row.appendChild(cardImage);
 
-    // Create a new row after every four cards or if it's the last card
-    // if ((index + 1) % 4 === 0 || index === cards.length - 1) {
+
       cardsContainer.appendChild(row);
-      // row = document.createElement('div');
-      // row.classList.add('card-row');
-    // }
+
   });
 }
 
+//
+// if ((index + 1) % 7 === 0 || index === cards.length - 1) {
+//   cardsContainer.appendChild(row);
+//   row = document.createElement('div');
+//   row.classList.add('card-row');
+// }
 
 
 
@@ -312,6 +314,19 @@ socket.on('updateTurnError', (error) => {
     console.error('Error updating turn:', error);
     // Handle the error appropriately, such as displaying an error message to the user
 });
+socket.on('wrongSubmition', () => {
+  alert('We think you should choose another option🤔');
+  console.log('hey')
+});
+
+socket.on('correctSubmission', () => {
+  // alert('We think you should choose another option🤔');
+  // console.log('hey')
+  checkboxContainer.innerHTML = '';
+
+});
+
+
 function createDropdown(name, options) {
     const dropdown = document.createElement('select');
     dropdown.name = name;
@@ -342,7 +357,7 @@ socket.on('promptPlayer', (prompt) => {
   console.log('Received prompt:', prompt);
 
   // Create a div element to hold the checkboxes
-  const checkboxContainer = document.createElement('div');
+  checkboxContainer = document.createElement('div');
 
   // Add a class to the container for styling
   checkboxContainer.classList.add('checkbox-container');
@@ -352,7 +367,7 @@ socket.on('promptPlayer', (prompt) => {
 
   const cards = ['suspect', 'weapon', 'room'];
   cards.forEach(card => {
-    const checkbox = document.createElement('input');
+    checkbox = document.createElement('input');
     checkbox.type = 'radio';
     checkbox.name = 'card';
     checkbox.value = prompt[card];
@@ -383,13 +398,12 @@ socket.on('promptPlayer', (prompt) => {
   submitButton.innerText = 'Submit';
   submitButton.addEventListener('click', () => {
     const checkboxes = document.querySelectorAll('input[type="radio"]:checked');
-    const selectedCards = Array.from(checkboxes).map(checkbox => checkbox.value);
-    const playerName = playerNameIndivisual; // Assuming you have playerNameIndivisual defined
-    console.log('Selected cards:', selectedCards);
+    const selectedCard = Array.from(checkboxes).map(checkbox => checkbox.value);
+    const playerName = playerNameIndivisual;
+    console.log('Selected cards:', selectedCard);
     // Emit the player's response to the server with player name
-    socket.emit('playerResponse', uid, { playerName, selectedCards });
+    socket.emit('playerResponse', uid, { playerName, selectedCard });
     // Clear the checkbox container
-    checkboxContainer.innerHTML = '';
     // Hide the question
     document.getElementById('question').classList.add('hidden');
   });
