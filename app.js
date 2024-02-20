@@ -152,6 +152,7 @@ socket.on('playerResponse', (uid, response) => {
     const playersInRoom = rooms[uid];
     console.log(response)
     let hasSelectedCards; // Declare the variable here
+    let firstNonSkipCardResponse;
     // let currentPlayerId;
     innerCurrentPlayerId = playersInRoom.find(player => player.name === response.playerName).id;
 
@@ -186,13 +187,19 @@ if (hasSelectedCards){    // Append the response to the list of responses
          playerName = firstNonSkipCardResponse.playerName;
          firstNonSkipCard = firstNonSkipCardResponse.selectedCard[0];
       }
+      else {
+        console.log('here')
+        firstNonSkipCard = 'undefined';
+        playerName = 'No one'
+
+      }
         const currentPlayerIndex = turn - 1; //turn =2,cpi=1
         let nextIndex = (currentPlayerIndex+1) % playersInRoom.length;//ni=2
 
       // Get the ID of the player whose turn it is
         currentPlayerId = playersInRoom[currentPlayerIndex].id;
         if ((typeof firstNonSkipCard === 'undefined')){
-          // console.log('yes')
+          console.log('yes')
            firstNonSkipCard = 'undefined';
            playerName = 'No one'
         }

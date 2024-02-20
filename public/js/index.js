@@ -93,14 +93,6 @@ function createCards(cards) {
   });
 }
 
-//
-// if ((index + 1) % 7 === 0 || index === cards.length - 1) {
-//   cardsContainer.appendChild(row);
-//   row = document.createElement('div');
-//   row.classList.add('card-row');
-// }
-
-
 
 // To start game, hide buttons and show dropdown to player1
 document.getElementById('startGameBtn').addEventListener('click', () => {
@@ -266,6 +258,7 @@ document.getElementById('nextTurnBtn').addEventListener('click', () => {
         socket.emit('sendAssumption', uid, assumption);
         console.log('Sent assumption to server:', assumption);
 
+
     } else {
         console.error('One or more dropdown elements not found or UID is undefined.');
     }
@@ -276,6 +269,7 @@ socket.on('updateTurn', (data) => {
     console.log('Received updated turn:', data);
 
     // Update the turn display or perform any necessary actions based on the updated turn
+
     turn = data.turn;
     const playerName = data.playerName;
     // Example: Update UI to display whose turn it is
@@ -299,6 +293,7 @@ socket.on('updateTurn', (data) => {
   else {
     const dropdownContainer = document.getElementById('dropdowns');
     dropdownContainer.innerHTML = '';
+
   document.getElementById('nextTurnBtn').classList.add('hidden');
   document.getElementById('final').classList.add('hidden');
   document.getElementById('question').classList.add('hidden');
@@ -361,6 +356,10 @@ socket.on('promptPlayer', (prompt) => {
 
   // Add a class to the container for styling
   checkboxContainer.classList.add('checkbox-container');
+  document.getElementById('reply').innerHTML ='';
+  document.getElementById('reply1').innerHTML='';
+  // document.getElementById('assumptions').innerHTML='';
+
 
   // Create a checkbox for each card mentioned in the prompt
   document.getElementById('question').classList.remove('hidden');
@@ -440,7 +439,7 @@ socket.on('playerResponseAll', (data) => {
 socket.on('playerResponse', (data) => {
   console.log('Received player response:', data.playerName,data.card);
   if (data.card === 'undefined'){
-      document.getElementById('reply1').innerHTML = `None has a clue`
+      document.getElementById('reply1').innerHTML = `No one has a clue`
   }else{
   document.getElementById('reply1').innerHTML = `<strong>${data.playerName}</strong> has ${data.card}`
 }
