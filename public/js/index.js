@@ -257,6 +257,8 @@ document.getElementById('nextTurnBtn').addEventListener('click', () => {
         // Emit assumption to server
         socket.emit('sendAssumption', uid, assumption);
         console.log('Sent assumption to server:', assumption);
+        dropdownContainer.innerHTML =''
+        document.getElementById('nextTurnBtn').classList.add('hidden')
 
 
     } else {

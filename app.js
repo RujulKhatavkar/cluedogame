@@ -74,7 +74,7 @@ io.on('connection', (socket) => {
       // Send player names to the client
       io.to(uid).emit('playerNames', playerNames);
       io.to(uid).emit('updateTurn', { turn, playerName: playersInRoom[turn - 1].name, uid }); // Pass uid here
-      console.log(turn)
+      // console.log(turn)
       turn2 = undefined;
       // Distribute cards
        const cards = distributeCards(uid, playersInRoom.length);
@@ -95,12 +95,12 @@ playersInRoom.forEach((player, index) => {
     console.log(currentPlayerIndex)
     // const turn2 = (currentPlayerIndex + 1) % playersInRoom.length;
     if ((typeof turn2 === 'undefined')){
-      console.log('I am here')
+      // console.log('I am here')
        turn2 = (currentPlayerIndex)
     }
     console.log('innerturn',turn2)
 
-    console.log(turn);
+    console.log('103 turn',turn);
     let nextPlayerIndex = (turn2+1) % playersInRoom.length;
     console.log(nextPlayerIndex)
     const nextPlayer = playersInRoom[nextPlayerIndex];
@@ -160,7 +160,7 @@ socket.on('playerResponse', (uid, response) => {
     if (response.selectedCard[0] !== 'Skip') {
         hasSelectedCards = checkPlayerCards(response.playerName, response.selectedCard[0]); // Assign value without 'let'
     } else {
-      console.log('hey')
+      // console.log('hey')
         hasSelectedCards = checkForCard(response.playerName);
     }
 
@@ -169,7 +169,7 @@ socket.on('playerResponse', (uid, response) => {
 
 if (hasSelectedCards){    // Append the response to the list of responses
     responses.push(response);
-    console.log(responses,'hey')
+    // console.log(responses,'hey')
 
     io.to(innerCurrentPlayerId).emit('correctSubmission');
 
@@ -188,7 +188,7 @@ if (hasSelectedCards){    // Append the response to the list of responses
          firstNonSkipCard = firstNonSkipCardResponse.selectedCard[0];
       }
       else {
-        console.log('here')
+        // console.log('here')
         firstNonSkipCard = 'undefined';
         playerName = 'No one'
 
@@ -198,18 +198,12 @@ if (hasSelectedCards){    // Append the response to the list of responses
 
       // Get the ID of the player whose turn it is
         currentPlayerId = playersInRoom[currentPlayerIndex].id;
-        if ((typeof firstNonSkipCard === 'undefined')){
-          console.log('yes')
-           firstNonSkipCard = 'undefined';
-           playerName = 'No one'
-        }
 
         // Emit playerName and the first non-skip card found
         io.to(currentPlayerId).emit('playerResponse', {playerName, card: firstNonSkipCard});
         io.to(uid).emit('playerResponseAll',{playerName});
 
       turn = (turn % playersInRoom.length) + 1;
-      // console.log(deactivatedPlayers.includes(playersInRoom[nextIndex].name))
       if (deactivatedPlayers.includes(playersInRoom[nextIndex].name)) {
           turn = (turn % playersInRoom.length) + 1;
       }
@@ -218,7 +212,7 @@ if (hasSelectedCards){    // Append the response to the list of responses
 
      io.to(uid).emit('updateTurn', { turn, playerName: playersInRoom[turn - 1].name});
 
-     console.log('Updated turn:', turn);
+     console.log('215 Updated turn:', turn);
 
       // Reset the responses array for the next prompt
       responses = [];
@@ -243,11 +237,11 @@ if (hasSelectedCards){    // Append the response to the list of responses
 function checkPlayerCards(playerName,selectedCard){
     // if cards[playerName].includes(selectedCards.values)
     const playerCards = cards[playerName];
-    console.log(cards)
+    // console.log(cards)
     // const selectedValues = Object.values(selectedCards);
     // for (const card of selectedValues) {
    if (playerCards.includes(selectedCard)) {
-     console.log(playerCards.includes(selectedCard))
+     // console.log(playerCards.includes(selectedCard))
      return true; // Player has at least one of the selected cards, so return true
  }
  return false
@@ -330,7 +324,7 @@ function distributeCards(uid, totalPlayers) {
 
     cardIndex += cardsPerPlayer;
   }
-  console.log(cards)
+  // console.log(cards)
 
   // Store the removed cards in the room
   rooms[uid].removedCards = {

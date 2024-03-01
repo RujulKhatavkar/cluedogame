@@ -164,11 +164,11 @@ button:disabled {
 
 .card-image {
   font-size: 30px;
-  padding: .5em;
+  /* padding: .5sem; */
   color: #ffffff;
 
   text-align: center;
-  height: 200px;
+  height: 170px;
   /* border: 1px solid #ccc; */
   display:flex;
   border-radius: 8px;
