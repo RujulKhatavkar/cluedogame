@@ -1,285 +1,199 @@
+// app.js
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
 const path = require('path');
 
-
-
-
 const app = express();
-app.use(express.static('__dirname'));
+// ✅ correct static path
+app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'public')));
+
 const server = http.createServer(app);
 const io = socketIO(server);
 
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Define a route to serve your HTML file
+// Serve index.html
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// ------------------------ Game Data ------------------------
+const rooms = {}; // { uid: [ {id, name}, ... ], state: {...} }
 
-const rooms = {};
-const players = {};
-let turn =1
-
-let promptResponsesCounter = 0;
 const suspects = ["Miss Scarlett", "Colonel Mustard", "Mr. White", "Dr. Green", "Mrs. Peacock", "Professor Plum"];
-const weapons = ["Candlestick", "Dagger", "Lead Pipe", "Revolver", "Rope", "Wrench"];
+const weapons  = ["Candlestick", "Dagger", "Lead Pipe", "Revolver", "Rope", "Wrench"];
 const gameRooms = ["Kitchen", "Ballroom", "Conservatory", "Dining Room", "Billiard Room", "Library", "Lounge", "Hall", "Study"];
-let responses = [];
-let playerassumption;
-let removedCards = {}
-turn2 = undefined;
-let deactivatedPlayers = [];
 
+// Per-room state helper
+function state(uid){
+  const room = rooms[uid];
+  if (!room.state){
+    room.state = {
+      turn: 1,                // 1-based
+      promptIndex: null,      // last prompted player index (0-based)
+      responses: [],          // responses for current assumption
+      deactivated: new Set(), // names that are out
+      cardsByPlayer: {},      // { "Player 1": [cards...] }
+      assumption: null,       // { suspect, weapon, room }
+      removed: null,          // hidden solution
+      awaiting: false         // expecting responses in current round
+    };
+  }
+  return room.state;
+}
 
-// Combine all cards
-// const allCardNames = [...suspects, ...weapons, ...gameRooms];
-
+// ------------------------ Socket.IO ------------------------
 io.on('connection', (socket) => {
   console.log(`Player ${socket.id} connected`);
 
+  // Create room
   socket.on('createRoom', () => {
     const uid = generateUID();
-    const playerName = `Player 1`;
-    rooms[uid] = [{ id: socket.id, name: `Player 1` }];
-
-    console.log(`Room created with UID: ${uid}`);
+    rooms[uid] = [{ id: socket.id, name: 'Player 1' }];
     socket.join(uid);
-    // console.log(`Ryou are: ${playerName}`);
+    console.log(`Room created with UID: ${uid}`);
     socket.emit('roomCreated', uid);
   });
 
+  // Join room
   socket.on('joinRoom', (uid) => {
-    if (rooms[uid]) {
-      const playerNumber = rooms[uid].length + 1;
-      rooms[uid].push({ id: socket.id, name: `Player ${playerNumber}` });
-      socket.join(uid);
-      console.log(`Player ${socket.id} joined room ${uid}`);
-    } else {
-      socket.emit('roomNotFound');
-    }
+    if (!rooms[uid]) return socket.emit('roomNotFound');
+    const playerNumber = rooms[uid].length + 1;
+    rooms[uid].push({ id: socket.id, name: `Player ${playerNumber}` });
+    socket.join(uid);
+    console.log(`Player ${socket.id} joined room ${uid}`);
   });
 
+  // Start game
   socket.on('startGame', (uid) => {
-    if (rooms[uid]) {
-      const playersInRoom = rooms[uid];
-      const playerNames = playersInRoom.map(player => player.name);
-      console.log('playerinroom' ,playersInRoom)
-      console.log('playerName',playerNames)
-      currentTurn = 1;
-      turn = 1
-
-      // Send player names to the client
-      io.to(uid).emit('playerNames', playerNames);
-      io.to(uid).emit('updateTurn', { turn, playerName: playersInRoom[turn - 1].name, uid }); // Pass uid here
-      // console.log(turn)
-      turn2 = undefined;
-      // Distribute cards
-       const cards = distributeCards(uid, playersInRoom.length);
-
-playersInRoom.forEach((player, index) => {
-  io.to(player.id).emit('receiveCards', { playerNameIndivisual: player.name, cards: cards[`Player ${index + 1}`] });
-  console.log('individual card', cards[`Player ${index + 1}`]);
-});
-
-
-      io.to(uid).emit('hideJoinButton');
-    }
-  });
-  function sendPromptToNextPlayer(uid, assumption) {
+    if (!rooms[uid]) return;
     const playersInRoom = rooms[uid];
-    const currentPlayerId = socket.id; // Get the current player's ID
-    const currentPlayerIndex = (turn - 1) % playersInRoom.length; // Get the index of the current player
-    console.log(currentPlayerIndex)
-    // const turn2 = (currentPlayerIndex + 1) % playersInRoom.length;
-    if ((typeof turn2 === 'undefined')){
-      // console.log('I am here')
-       turn2 = (currentPlayerIndex)
-    }
-    console.log('innerturn',turn2)
 
-    console.log('103 turn',turn);
-    let nextPlayerIndex = (turn2+1) % playersInRoom.length;
-    console.log(nextPlayerIndex)
-    const nextPlayer = playersInRoom[nextPlayerIndex];
-    console.log(nextPlayer)
+    // init state
+    const st = state(uid);
+    st.turn = 1;
+    st.promptIndex = null;
+    st.responses = [];
+    st.deactivated = new Set();
+    st.assumption = null;
+    st.awaiting = false;
 
-    if (nextPlayer.id !== currentPlayerId){
-        io.to(nextPlayer.id).emit('promptPlayer', assumption);
-    }
-    turn2 = nextPlayerIndex
-  }
+    // deal cards & store per-room
+    const dealt = distributeCards(uid, playersInRoom.length);
+    st.cardsByPlayer = dealt;
 
+    // send players + initial turn
+    io.to(uid).emit('playerNames', playersInRoom.map(p => p.name));
+    io.to(uid).emit('updateTurn', { turn: st.turn, playerName: playersInRoom[st.turn - 1].name, uid });
+
+    // send each player their cards
+    playersInRoom.forEach((player, index) => {
+      io.to(player.id).emit('receiveCards', {
+        playerNameIndivisual: player.name,
+        cards: dealt[`Player ${index + 1}`]
+      });
+    });
+
+    io.to(uid).emit('hideJoinButton');
+  });
+
+  // New assumption from current player
   socket.on('sendAssumption', (uid, assumption) => {
-    console.log('Received assumption with UID:', uid);
-      if (rooms[uid]) {
-          const playersInRoom = rooms[uid];
-          console.log('Received assumption from client:', assumption);
-          playerassumption = assumption;
+    if (!rooms[uid]) return socket.emit('updateTurnError', 'Room not found.');
+    const playersInRoom = rooms[uid];
+    const st = state(uid);
 
-          // Emit the assumption to all other players in the same room
-          socket.to(uid).emit('receiveAssumption', { assumption,playerName: playersInRoom[turn - 1].name });
+    st.assumption = assumption;
+    st.responses = [];
+    st.promptIndex = null;
+    st.awaiting = true;
 
-          console.log('Sent assumption to other players:', assumption);
-          sendPromptToNextPlayer(uid, assumption);
-
-      } else {
-          // If room is not found, emit an error event
-          socket.emit('updateTurnError', 'Room not found.');
-      }
+    const askerName = playersInRoom[st.turn - 1].name;
+    socket.to(uid).emit('receiveAssumption', { assumption, playerName: askerName });
+    sendPromptToNextPlayer(uid, assumption, askerName);
   });
-function checkForCard(playerName){
-  const playerCards = cards[playerName];
-  const selectedValues = Object.values(playerassumption);
-  for (const card of selectedValues) {
-    console.log(card)
-    console.log(playerCards)
 
-
- if (playerCards.includes(card)) {
-
-   return false; // Player has at least one of the selected cards, so return true
- }
-}
-return true
-}
-
-
-socket.on('playerResponse', (uid, response) => {
-  if (rooms[uid]) {
+  // A player responded to the prompt
+  socket.on('playerResponse', (uid, response) => {
+    if (!rooms[uid]) return socket.emit('updateTurnError', 'Room not found.');
     const playersInRoom = rooms[uid];
-    console.log(response)
-    let hasSelectedCards; // Declare the variable here
-    let firstNonSkipCardResponse;
-    // let currentPlayerId;
-    innerCurrentPlayerId = playersInRoom.find(player => player.name === response.playerName).id;
+    const st = state(uid);
+    if (!st.awaiting) return; // ignore late/stale replies
 
+    const responder = playersInRoom.find(p => p.name === response.playerName);
+    const responderId = responder ? responder.id : null;
 
-    if (response.selectedCard[0] !== 'Skip') {
-        hasSelectedCards = checkPlayerCards(response.playerName, response.selectedCard[0]); // Assign value without 'let'
+    const hasCard = (name, card) => (st.cardsByPlayer[name] || []).includes(card);
+
+    const ok = (response.selectedCard[0] !== 'Skip')
+      ? hasCard(response.playerName, response.selectedCard[0])
+      : !Object.values(st.assumption || {}).some(c => hasCard(response.playerName, c)); // Skip valid only if no matching card
+
+    if (ok){
+      st.responses.push(response);
+      if (responderId) io.to(responderId).emit('correctSubmission');
+
+      if (st.responses.length >= expectedResponders(uid)){
+        return finishPromptRound(uid);
+      }
+      const askerName = playersInRoom[st.turn - 1].name;
+      sendPromptToNextPlayer(uid, st.assumption, askerName);
     } else {
-      // console.log('hey')
-        hasSelectedCards = checkForCard(response.playerName);
+      if (responderId) io.to(responderId).emit('wrongSubmition'); // keep original event name
+    }
+  });
+
+  // Final guess check
+  socket.on('checkGuess', (uid, { playerNameIndivisual, answer }) => {
+    if (!rooms[uid]) return;
+
+    const st = state(uid);
+    if (JSON.stringify(answer) === JSON.stringify(st.removed)){
+      io.to(uid).emit('winner', { playerName: playerNameIndivisual });
+      return;
     }
 
+    // wrong guess → deactivate player & reset round state
+    st.deactivated.add(playerNameIndivisual);
+    st.responses = [];
+    st.promptIndex = null;
+    st.assumption = null;
+    st.awaiting = false;
 
-
-
-if (hasSelectedCards){    // Append the response to the list of responses
-    responses.push(response);
-    // console.log(responses,'hey')
-
-    io.to(innerCurrentPlayerId).emit('correctSubmission');
-
-
-
-    // Check if responses from all players have been received
-    if (responses.length === playersInRoom.length - 1) { // Assuming each player except the current player responds
-      // Find the first non-skip card
-      const firstNonSkipCardResponse = responses.find(response => response.selectedCard[0] !== 'Skip');
-      console.log(firstNonSkipCardResponse)
-
-      // If a non-skip card is found
-      if (firstNonSkipCardResponse){
-
-         playerName = firstNonSkipCardResponse.playerName;
-         firstNonSkipCard = firstNonSkipCardResponse.selectedCard[0];
-      }
-      else {
-        // console.log('here')
-        firstNonSkipCard = 'undefined';
-        playerName = 'No one'
-
-      }
-        const currentPlayerIndex = turn - 1; //turn =2,cpi=1
-        let nextIndex = (currentPlayerIndex+1) % playersInRoom.length;//ni=2
-
-      // Get the ID of the player whose turn it is
-        currentPlayerId = playersInRoom[currentPlayerIndex].id;
-
-        // Emit playerName and the first non-skip card found
-        io.to(currentPlayerId).emit('playerResponse', {playerName, card: firstNonSkipCard});
-        io.to(uid).emit('playerResponseAll',{playerName});
-
-      turn = (turn % playersInRoom.length) + 1;
-      if (deactivatedPlayers.includes(playersInRoom[nextIndex].name)) {
-          turn = (turn % playersInRoom.length) + 1;
-      }
-
-
-
-     io.to(uid).emit('updateTurn', { turn, playerName: playersInRoom[turn - 1].name});
-
-     console.log('215 Updated turn:', turn);
-
-      // Reset the responses array for the next prompt
-      responses = [];
-      turn2 = undefined;
-
-    }
-    else{
-        sendPromptToNextPlayer(uid, playerassumption);
-        console.log("here")
-    }
-  } else {
-        io.to(innerCurrentPlayerId).emit('wrongSubmition');
-        console.log("lost")
-  }
-}else {
-    // If room is not found, emit an error event
-    socket.emit('updateTurnError', 'Room not found.');
-  }
-});
-
-
-function checkPlayerCards(playerName,selectedCard){
-    // if cards[playerName].includes(selectedCards.values)
-    const playerCards = cards[playerName];
-    // console.log(cards)
-    // const selectedValues = Object.values(selectedCards);
-    // for (const card of selectedValues) {
-   if (playerCards.includes(selectedCard)) {
-     // console.log(playerCards.includes(selectedCard))
-     return true; // Player has at least one of the selected cards, so return true
- }
- return false
-
-}
-
-socket.on('checkGuess',(uid, response)=>{
-  if (rooms[uid]) {
     const playersInRoom = rooms[uid];
-    const removedCardsString = JSON.stringify(removedCards);
-    const answerString = JSON.stringify(response.answer);
 
-    if (removedCardsString == answerString){
-      console.log('hurray')
-       io.to(uid).emit("winner",{playerName:response.playerNameIndivisual})
+    // advance to next active player
+    let next = st.turn;
+    for (let i = 0; i < playersInRoom.length; i++){
+      next = (next % playersInRoom.length) + 1;
+      if (!st.deactivated.has(playersInRoom[next - 1].name)) break;
     }
-    else{
+    st.turn = next;
 
-      deactivatedPlayers.push(response.playerNameIndivisual)
-      console.log(turn)
-        turn = (turn % playersInRoom.length) + 1;
-      io.to(uid).emit("loser",{playerName:response.playerNameIndivisual})
-      io.to(uid).emit('updateTurn', { turn, playerName: playersInRoom[turn - 1].name});
-    }
+    io.to(uid).emit('loser', { playerName: playerNameIndivisual });
+    io.to(uid).emit('updateTurn', { turn: st.turn, playerName: playersInRoom[st.turn - 1].name });
+  });
 
-  }
-
-});
-
-
-
-
+  // Disconnect handling
   socket.on('disconnect', () => {
-    // Handle player disconnection
-    for (const uid in rooms) {
-      const index = rooms[uid].findIndex(player => player.id === socket.id);
-      if (index !== -1) {
-        rooms[uid].splice(index, 1);
+    for (const uid in rooms){
+      const idx = rooms[uid].findIndex(p => p.id === socket.id);
+      if (idx !== -1){
+        const name = rooms[uid][idx].name;
+        const st = state(uid);
+        st.deactivated.add(name);
+
+        const playersInRoom = rooms[uid];
+        // if it was their turn, advance to next active
+        if (playersInRoom.length){
+          if (st.turn - 1 === idx){
+            for (let i = 0; i < playersInRoom.length; i++){
+              st.turn = (st.turn % playersInRoom.length) + 1;
+              if (!st.deactivated.has(playersInRoom[st.turn - 1].name)) break;
+            }
+            io.to(uid).emit('updateTurn', { turn: st.turn, playerName: playersInRoom[st.turn - 1].name });
+          }
+        }
         console.log(`Player ${socket.id} disconnected from room ${uid}`);
         break;
       }
@@ -287,63 +201,91 @@ socket.on('checkGuess',(uid, response)=>{
   });
 });
 
-function generateUID() {
-  return Math.random().toString(36).substr(2, 6);
+// ------------------------ Turn/Prompt Helpers ------------------------
+function sendPromptToNextPlayer(uid, assumption, askerName){
+  const playersInRoom = rooms[uid];
+  const st = state(uid);
+  let idx = (st.promptIndex == null ? (st.turn - 1) : st.promptIndex);
+
+  for (let i = 0; i < playersInRoom.length; i++){
+    idx = (idx + 1) % playersInRoom.length;
+    const next = playersInRoom[idx];
+    if (next.name !== askerName && !st.deactivated.has(next.name)){
+      io.to(next.id).emit('promptPlayer', assumption);
+      st.promptIndex = idx;
+      return;
+    }
+  }
+  // nobody eligible → finish round immediately
+  finishPromptRound(uid);
 }
 
+function expectedResponders(uid){
+  const players = rooms[uid];
+  const st = state(uid);
+  const asker = players[st.turn - 1].name;
+  return players.filter(p => p.name !== asker && !st.deactivated.has(p.name)).length;
+}
 
+function finishPromptRound(uid){
+  const players = rooms[uid];
+  const st = state(uid);
 
-// Update distributeCards function to use card names
-// Update distributeCards function to remove one card from each category
+  const first = st.responses.find(r => r.selectedCard[0] !== 'Skip');
+  const card = first ? first.selectedCard[0] : 'undefined';
+  const who  = first ? first.playerName    : 'No one';
+
+  const currentId = players[st.turn - 1].id;
+  io.to(currentId).emit('playerResponse', { playerName: who, card });
+  io.to(uid).emit('playerResponseAll', { playerName: who });
+
+  // advance to next active player
+  let next = st.turn;
+  for (let i = 0; i < players.length; i++){
+    next = (next % players.length) + 1;
+    if (!st.deactivated.has(players[next - 1].name)) break;
+  }
+  st.turn = next;
+
+  // reset round state
+  st.promptIndex = null;
+  st.responses = [];
+  st.assumption = null;
+  st.awaiting = false;
+
+  io.to(uid).emit('updateTurn', { turn: st.turn, playerName: players[st.turn - 1].name });
+}
+
+// ------------------------ Dealing ------------------------
 function distributeCards(uid, totalPlayers) {
-  // Shuffle the cards
   const shuffledSuspects = shuffle([...suspects]);
-  const shuffledWeapons = shuffle([...weapons]);
-  const shuffledRooms = shuffle([...gameRooms]);
+  const shuffledWeapons  = shuffle([...weapons]);
+  const shuffledRooms    = shuffle([...gameRooms]);
 
-  // Remove one card from each category
+  // remove one from each category (solution)
   const removedSuspect = shuffledSuspects.pop();
-  const removedWeapon = shuffledWeapons.pop();
-  const removedRoom = shuffledRooms.pop();
+  const removedWeapon  = shuffledWeapons.pop();
+  const removedRoom    = shuffledRooms.pop();
 
-  // Combine the remaining cards
   const remainingCards = [...shuffledSuspects, ...shuffledWeapons, ...shuffledRooms];
-
-  // Shuffle the remaining cards again
   const shuffledRemainingCards = shuffle(remainingCards);
 
-  // Calculate the number of cards per player
+  const cards = {};
   const cardsPerPlayer = Math.floor(shuffledRemainingCards.length / totalPlayers);
-
-  // Distribute cards to players
-  cards = {};
-  let cardIndex = 0; // Track the index of shuffled remaining cards
+  let cardIndex = 0;
 
   for (let i = 0; i < totalPlayers; i++) {
     cards[`Player ${i + 1}`] = shuffledRemainingCards.slice(cardIndex, cardIndex + cardsPerPlayer);
-
     cardIndex += cardsPerPlayer;
   }
-  // console.log(cards)
 
-  // Store the removed cards in the room
-  rooms[uid].removedCards = {
-    suspect: removedSuspect,
-    weapon: removedWeapon,
-    room: removedRoom
-  };
-
-  removedCards = {
-    suspect: removedSuspect,
-    weapon: removedWeapon,
-    room: removedRoom
-  }
-
-  // Console log the removed cards
-  console.log('Removed Cards:', rooms[uid].removedCards);
+  // keep solution in per-room state
+  state(uid).removed = { suspect: removedSuspect, weapon: removedWeapon, room: removedRoom };
+  console.log('Removed Cards (solution):', state(uid).removed);
 
   return cards;
 }
+
 function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -352,9 +294,12 @@ function shuffle(array) {
   return array;
 }
 
+// ------------------------ Utils & Server ------------------------
+function generateUID() {
+  return Math.random().toString(36).substring(2, 8);
+}
 
 const PORT = process.env.PORT || 3000;
-
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
