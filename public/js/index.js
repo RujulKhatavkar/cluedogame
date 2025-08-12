@@ -3,7 +3,7 @@ const socket = io();
 let playerNames;
 let cards;
 const suspects = ["Miss Scarlett", "Colonel Mustard", "Mr. White", "Dr. Green", "Mrs. Peacock", "Professor Plum"];
-const weapons = ["Candlestick", "Dagger", "Lead Pipe", "Revolver", "Rope", "Wrench"];
+const weapons = ["Candlestick", "Knife", "Lead Pipe", "Revolver", "Rope", "Wrench"];
 const gameRooms = ["Kitchen", "Ballroom", "Conservatory", "Dining Room", "Billiard Room", "Library", "Lounge", "Hall", "Study"];
 let uid; // Declare uid here
 let playerNameIndivisual;
@@ -48,14 +48,16 @@ socket.on('playerNames', (receivedPlayerNames) => {
 });
 socket.on('receiveCards', (data) => {
   console.log('Received cards:', data);
+  const split = document.getElementById('split');
+  if (split) split.classList.remove('hidden');
   // const allCardNames = [...new Set(Object.values(cards).flat())];
 
   playerNameIndivisual = data.playerNameIndivisual;
   const cards = data.cards;
-  playerNamesDisplay.innerHTML = `You are <strong>${playerNameIndivisual}</strong>`;
+  playerNamesDisplay.innerHTML = `<h1>You are <strong>${playerNameIndivisual}</strong></h1>`;
 
   recievedCards = cards;
-  playerCards.innerText = cards;
+  // playerCards.innerText = cards;
   // console.log(allCardNames);
   createDynamicTable(allCardNames, playerNames);
   createCards(cards);
@@ -77,9 +79,6 @@ function createCards(cards) {
 
     const row = document.createElement('div');
     row.classList.add('card-row');
-    row.style.display = 'grid';
-    row.style.gridTemplateColumns = 'repeat(auto-fit, minmax(200px, 1fr))';
-    row.style.gap = '20px';
 
     list.forEach(card => {
       const tile = document.createElement('div');
@@ -145,6 +144,7 @@ socket.on('hideJoinButton', () => {
   document.getElementById('startGameBtn').classList.add('hidden');
   document.getElementById('joiningMessage').classList.add('hidden');
 
+
 if (gameUid){
   gameUid.innerHTML = ''
 }
@@ -171,10 +171,9 @@ socket.on('roomCreated', (data) => {
 
   // Create a <h1> element to display the UID
   gameUid = document.getElementById('uidGiven')
-  gameUid.innerHTML = 'Give the following code to your friends who want to join the game:<br>' + uid;
+  gameUid.innerHTML = 'Give the following code to your friends who want to join the game:<br><strong>' + uid + '</strong>';
+  document.getElementById('createRoomBtn').classList.add('hidden');
 
-  // Append the <h1> element to the document body
-  document.body.appendChild(uidGiven);
 });
 
 
@@ -196,16 +195,21 @@ function createDynamicTable(playerNames, allcardNames) {
   table.appendChild(headerRow);
 
   // Create rows for each card
-  playerNames.forEach((playerName) => {
+  playerNames.forEach((playerName,i) => {
     const row = document.createElement('tr');
     row.innerHTML = `<td>${playerName}</td>` + allcardNames.map((cardName, index) => {
       // Check if the current card belongs to a new group
+      if (i === suspects.length - 1 || i === suspects.length + weapons.length - 1) {
+        row.classList.add('group-end');
+      }
       const currentType = index < suspects.length ? 'suspect' : index < suspects.length + weapons.length ? 'weapon' : 'room';
       const boldLine = previousType !== '' && currentType !== previousType ? '<td><strong>---</strong></td>' : '';
       previousType = currentType;
       return boldLine + '<td></td>';
     }).join('');
     table.appendChild(row);
+    document.getElementById('tablePane').classList.remove('hidden');
+    document.getElementById('cardsPane').classList.remove('hidden');
   });
 }
 
@@ -473,7 +477,6 @@ socket.on('playerResponse', (data) => {
 });
 
 document.getElementById('final').addEventListener('click', () => {
-  console.log("clicked me")
   finalGuess = prompt('Enter the word "guess" if you want to check the answer. Please note the you will be an inactive player if the assumptions are incorrect');
   if (finalGuess =='guess'){
   const suspectDropdown = document.getElementById('suspects');
@@ -489,7 +492,6 @@ document.getElementById('final').addEventListener('click', () => {
       weapon: selectedWeapon,
       room: selectedRoom
   };
-  console.log(answer)
 
 socket.emit('checkGuess', uid, { playerNameIndivisual, answer });
 }

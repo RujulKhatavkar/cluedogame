@@ -16,20 +16,32 @@
   <button id="startGameBtn">Start Game</button>
   <div id="playerNamesDisplay"></div>
   <div id="playerCards"></div>
-<center>  <div id="cardsContainer"></div></center>
-  <table id="playerCardsTable"></table>
-  <div id = "reply"></div>
-  <div id = "reply1"></div>
 
-  <div id = "assumptions"></div>
+  <div id="split" class="hidden">
+    <section id="cardsPane" class="pane hidden">
+      <h2 class="pane-title">Your Cards</h2>
+      <div id="cardsContainer"></div>
+    </section>
 
+    <section id="tablePane" class="pane hidden">
 
+      <div class="table-scroll">
+        <table id="playerCardsTable"></table>
+      </div>
 
+      <div id="assumptions" class="mt"></div>
+      <div id="reply" class="mt"></div>
+      <div id="reply1" class="mt"></div>
 
-  <div id = "dropdowns"></div>
-  <button id ='nextTurnBtn' class="hidden">Send Assumption</button>
-  <button id = "final"  class="hidden">I Know</button>
-  <div id= "question" class="hidden"> Do you have any of these cards:</div>
+      <div id="question" class="hidden mt">Do you have any of these cards:</div>
+      <div id="dropdowns" class="mt"></div>
+
+      <div class="mt" id="game">
+        <button id="nextTurnBtn" class="hidden btn">Send Assumptions</button>
+        <button id="final" class="hidden btn">Final Guess</button>
+      </div>
+    </section>
+  </div>
 
 
 

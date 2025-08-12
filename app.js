@@ -21,7 +21,7 @@ app.get('/', (req, res) => {
 const rooms = {}; // { uid: [ {id, name}, ... ], state: {...} }
 
 const suspects = ["Miss Scarlett", "Colonel Mustard", "Mr. White", "Dr. Green", "Mrs. Peacock", "Professor Plum"];
-const weapons  = ["Candlestick", "Dagger", "Lead Pipe", "Revolver", "Rope", "Wrench"];
+const weapons  = ["Candlestick", "Knife", "Lead Pipe", "Revolver", "Rope", "Wrench"];
 const gameRooms = ["Kitchen", "Ballroom", "Conservatory", "Dining Room", "Billiard Room", "Library", "Lounge", "Hall", "Study"];
 
 // Per-room state helper
