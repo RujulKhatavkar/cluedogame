@@ -291,4 +291,12 @@ button:disabled {
   border-bottom-width: 1px;
   border-bottom-color: #9ca3af; /* tweak color if you want */
 }
+.checkbox-container{
+  text-align: start;
+  padding-left: 20%;
+}
+#assumptions{
+  text-align: start;
+  padding-left: 20%;
+}
 

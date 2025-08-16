@@ -232,7 +232,7 @@ playerCardsTable.addEventListener('click', function (event) {
     console.log(target.getAttribute('currentState'))
     switch (currentState) {
       case 'empty':
-        target.innerHTML = '<i class="correct-icon">✔️</i>';
+        target.innerHTML = '<i class="correct-icon col">✔️</i>';
         target.setAttribute('data-state', 'correct');
         break;
       case 'correct':
@@ -339,7 +339,7 @@ socket.on('updateTurnError', (error) => {
 });
 socket.on('wrongSubmition', () => {
   alert('We think you should choose another option🤔');
-  console.log('hey')
+  
 });
 
 socket.on('correctSubmission', () => {
@@ -439,7 +439,10 @@ socket.on('promptPlayer', (prompt) => {
   checkboxContainer.appendChild(submitButton);
 
   // Append the checkbox container to the document body
-  document.body.appendChild(checkboxContainer);
+  const host = document.getElementById('tablePane')
+  host.appendChild(checkboxContainer);
+  host.scrollTop = host.scrollHeight;
+  // document.body.appendChild(checkboxContainer);
   window.scrollTo(0, document.body.scrollHeight);
 
 
