@@ -11,16 +11,19 @@ const server = http.createServer(app);
 
 // Socket.IO (allow Vite dev server origin)
 const io = socketIO(server, {
-  cors: {
-    origin: isProd ? true : [
-      "http://localhost:5173",
-      "http://127.0.0.1:5173",
-      "http://localhost:3000",
-      "http://127.0.0.1:3000",
-    ],
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
+  cors:
+    process.env.NODE_ENV === "production"
+      ? { origin: true, methods: ["GET", "POST"], credentials: true }
+      : {
+          origin: [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+          ],
+          methods: ["GET", "POST"],
+          credentials: true,
+        },
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -851,6 +854,6 @@ if (accuser.eliminated) return roomError(socket, 'You are eliminated and can onl
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
