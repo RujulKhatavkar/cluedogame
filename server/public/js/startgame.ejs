@@ -1,0 +1,23 @@
+<!-- startgame.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Start Game</title>
+</head>
+<body>
+  <h1>Room ID: <%= roomId %></h1>
+  <p>Share this room ID with your friends to join the game!</p>
+  <a href="/play-game/<%= roomId %>">Start Game</a>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    // Replace with your logic to handle user input and join the room
+    const playerName = prompt('Enter your name:');
+    socket.emit('join-room', '<%= roomId %>', playerName);
+  </script>
+</body>
+</html>

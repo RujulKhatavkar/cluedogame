@@ -1,0 +1,22 @@
+<!-- playgame.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Play Game</title>
+</head>
+<body>
+  <h1>Waiting for the game to start...</h1>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    // Replace with your logic to handle game start
+    socket.on('game-started', () => {
+      window.location.href = '/play-game/<%= roomId %>';
+    });
+  </script>
+</body>
+</html>

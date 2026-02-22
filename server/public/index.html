@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multiplayer Game</title>
+  <link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+  <div id="game">
+  <button id="createRoomBtn">Create Room</button>
+  <h3 id = "uidGiven"></h3>
+  <button id="joinRoomBtn">Join Room</button>
+  <h3 id = 'joiningMessage' class="hidden">Welcome to the game of cluedo. There is a murderer on the loose. You have been chosen to find what took place on that night. Game will start soon...</h3>
+  <button id="startGameBtn">Start Game</button>
+  <div id="playerNamesDisplay"></div>
+  <div id="playerCards"></div>
+
+  <div id="split" class="hidden">
+    <section id="cardsPane" class="pane hidden">
+      <h2 class="pane-title">Your Cards</h2>
+      <div id="cardsContainer"></div>
+    </section>
+
+    <section id="tablePane" class="pane hidden">
+
+      <div class="table-scroll">
+        <table id="playerCardsTable"></table>
+      </div>
+
+      <div id="assumptions" class="mt"></div>
+      <div id="reply" class="mt"></div>
+      <div id="reply1" class="mt"></div>
+
+      <div id="question" class="hidden mt">Do you have any of these cards:</div>
+      <div id="dropdowns" class="mt"></div>
+
+      <div class="mt" id="game">
+        <button id="nextTurnBtn" class="hidden btn">Send Assumptions</button>
+        <button id="final" class="hidden btn">Final Guess</button>
+      </div>
+    </section>
+  </div>
+
+
+
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.js"></script>
+  <script src="./js/index.js"></script>
+</body>
+</html>

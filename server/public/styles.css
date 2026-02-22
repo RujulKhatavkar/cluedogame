@@ -1,0 +1,302 @@
+.hidden {
+  display: none;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  border: 1px solid #dddddd;
+  text-align: left;
+  padding: 8px;
+}
+/* Added CSS for Cluedo game */
+#game {
+margin: auto;
+width: 95%;
+text-align: center;
+}
+
+button {
+margin: 5px;
+padding: 10px 20px;
+background-color: #4CAF50;
+color: white;
+border: none;
+cursor: pointer;
+border-radius: 5px;
+}
+
+button:hover {
+background-color: #45a049;
+}
+
+#uidGiven {
+margin-top: 20px;
+}
+
+#playerNamesDisplay {
+margin-top: 20px;
+}
+
+#playerCards {
+margin-top: 20px;
+}
+
+#playerCardsTable {
+margin-top: 20px;
+}
+
+#reply {
+margin-top: 20px;
+}
+
+#reply1 {
+margin-top: 20px;
+}
+
+#assumptions {
+margin-top: 20px;
+}
+
+#dropdowns {
+margin-top: 20px;
+}
+
+#nextTurnBtn, #final {
+margin-top: 20px;
+}
+
+#question {
+margin-top: 20px;
+}
+
+.hidden {
+display: none;
+}
+
+table {
+border-collapse: collapse;
+width: 100%;
+}
+
+th, td {
+border: 1px solid #dddddd;
+text-align: left;
+padding: 8px;
+}
+
+/* Dropdown container */
+.dropdown-container {
+  margin-bottom: 10px;
+}
+
+/* Dropdown styles */
+select {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 100%;
+  font-size: 16px;
+}
+
+/* Button styles */
+button {
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Cards container */
+.cards-container {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+/* Card styles */
+.card {
+  /* width: 150px; */
+
+  /* box-sizing: border-box; */
+}
+
+/* Add CSS to style the cards container */
+#cardsContainer {
+  display: flex; /* Ensure cards are displayed horizontally */
+  flex-wrap: wrap; /* Allow cards to wrap to the next line when there's not enough space */
+  gap: 10px; /* Add some space between cards */
+}
+
+/* Add CSS to style the player cards table */
+#playerCardsTable {
+  margin-top: 20px; /* Add some space between the cards container and the table */
+  border-collapse: collapse; /* Collapse table borders */
+}
+
+#playerCardsTable th, #playerCardsTable td {
+  padding: 8px 16px; /* Add padding to table cells */
+  border: 1px solid #ddd; /* Add borders to table cells */
+}
+
+#playerCardsTable th {
+  background-color: #f2f2f2; /* Add background color to table header cells */
+}
+
+#playerCardsTable td {
+  text-align: center; /* Center-align table cell content */
+}
+.card {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-gap: 5px;
+
+}
+
+/* Page rhythm */
+#cardsContainer{
+  max-width: 1100px;
+  margin: 12px auto 32px;
+  padding: 0 16px;
+}
+
+/* Section title */
+.cards-section h3{
+  margin: 12px 0 8px;
+  text-align: center;
+  font-size: 1.25rem;
+  letter-spacing: .3px;
+}
+
+/* Card tiles */
+.card-tile{
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
+.card-row{
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  justify-items: center;         /* center items in each cell */
+}
+
+.card-image{
+  width: clamp(110px, 15vw, 153px);  /* cap size so single card stays small */
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.card-image:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.15);
+}
+
+/* Optional caption style if you show names */
+.card-caption{
+  font-size: .9rem;
+  color: #333;
+}
+
+/* Tighter on phones, wider on desktops */
+@media (max-width: 480px){
+  .card-row{ grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+}
+@media (min-width: 900px){
+  .card-row{ grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+}
+
+#playerNamesDisplay { font-weight:600; }
+#uidGiven { font-size: 0.95rem; color:#374151; }
+
+    /* Split layout */
+#split{
+      display:grid;
+      grid-template-columns: 1fr 1fr; /* 50/50 */
+      gap:16px;
+      height: calc(100vh - 74px); /* header height approx */
+      padding: 12px 16px;
+      box-sizing: border-box;
+    }
+    .pane{
+      background:#fff;
+      border:1px solid #e5e7eb;
+      border-radius:12px;
+      padding:12px;
+      overflow:auto;
+      box-sizing:border-box;
+    }
+    .pane-title{
+      margin:0 0 8px;
+      font-size:1.1rem;
+      text-align:center;
+    }
+
+    /* Cards grid (left) */
+    .card-row{
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      justify-items: center;     /* centers each card in its cell */
+    }
+    
+    /* make the image fit the grid cell */
+    .card-image{
+      width: 100%;
+      max-width: 150px;          /* tweak this number if you want smaller/bigger */
+      aspect-ratio: 2 / 3;
+      object-fit: cover;
+      border-radius: 12px;
+    }
+    .card-image:hover{
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(0,0,0,.15);
+    }
+
+    /* Table (right) */
+    .table-scroll{
+      overflow:auto;
+      max-height: 55vh;          /* leave space for controls below */
+      border:1px solid #eee;
+      border-radius:8px;
+    }
+    #playerCardsTable{
+      width:100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    #playerCardsTable th, #playerCardsTable td{
+      border:1px solid #e5e7eb;
+      padding:6px 8px;
+      text-align:center;
+      font-size:0.9rem;
+    }
+    #playerCardsTable th{
+      position: sticky; top: 0; background:#f9fafb; z-index:1;
+    }
+
+    /* bold separator after a category ends */
+#playerCardsTable tr.group-end > th,
+#playerCardsTable tr.group-end > td{
+  border-bottom-width: 1px;
+  border-bottom-color: #9ca3af; /* tweak color if you want */
+}
+.checkbox-container{
+  text-align: start;
+  padding-left: 20%;
+}
+#assumptions{
+  text-align: start;
+  padding-left: 20%;
+}
+
