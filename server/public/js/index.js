@@ -379,79 +379,101 @@ socket.on('receiveAssumption', (data) => {
 socket.on('promptPlayer', (prompt) => {
   console.log('Received prompt:', prompt);
 
-  // Create a div element to hold the checkboxes
+  // Remove any previous prompt UI (in case it wasn't cleared)
+  if (window.checkboxContainer && window.checkboxContainer.parentNode) {
+    window.checkboxContainer.parentNode.removeChild(window.checkboxContainer);
+  }
+
+  // Create a div element to hold the radios
   checkboxContainer = document.createElement('div');
+  window.checkboxContainer = checkboxContainer;
 
-  // Add a class to the container for styling
   checkboxContainer.classList.add('checkbox-container');
-  document.getElementById('reply').innerHTML ='';
-  document.getElementById('reply1').innerHTML='';
-  // document.getElementById('assumptions').innerHTML='';
+  document.getElementById('reply').innerHTML = '';
+  document.getElementById('reply1').innerHTML = '';
 
-
-  // Create a checkbox for each card mentioned in the prompt
   document.getElementById('question').classList.remove('hidden');
 
-  const cards = ['suspect', 'weapon', 'room'];
-  cards.forEach(card => {
-    checkbox = document.createElement('input');
-    checkbox.type = 'radio';
-    checkbox.name = 'card';
-    checkbox.value = prompt[card];
-    checkbox.id = prompt[card];
-    const label = document.createElement('label');
-    label.htmlFor = card;
-    label.appendChild(document.createTextNode(`${card}: ${prompt[card]}`));
-    checkboxContainer.appendChild(checkbox);
-    checkboxContainer.appendChild(label);
-    checkboxContainer.appendChild(document.createElement('br'));
-  });
+  // Instruction
+  const instruction = document.createElement('div');
+  instruction.classList.add('prompt-instruction');
+  instruction.innerHTML = '<strong>Your turn to respond:</strong> pick a card you can show, or select <em>Skip</em>.';
+  checkboxContainer.appendChild(instruction);
+  checkboxContainer.appendChild(document.createElement('br'));
 
-  // Add a "Skip" option
-  const skipCheckbox = document.createElement('input');
-  skipCheckbox.type = 'radio';
-  skipCheckbox.name = 'card';
-  skipCheckbox.value = 'Skip';
-  skipCheckbox.id = 'Skip';
+  // Prompt cards
+  const promptCards = [
+    { type: 'Suspect', value: prompt.suspect },
+    { type: 'Weapon', value: prompt.weapon },
+    { type: 'Room',   value: prompt.room }
+  ];
+
+  // Only show options the player owns
+  const ownedMatches = promptCards.filter(c => Array.isArray(recievedCards) && recievedCards.includes(c.value));
+
+  if (ownedMatches.length === 0) {
+    const noneMsg = document.createElement('div');
+    noneMsg.classList.add('no-match');
+    noneMsg.textContent = "You don't have any of these cards. Please select Skip to continue.";
+    checkboxContainer.appendChild(noneMsg);
+    checkboxContainer.appendChild(document.createElement('br'));
+  } else {
+    ownedMatches.forEach(c => {
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'card';
+      radio.value = c.value;
+      radio.id = c.value;
+
+      const label = document.createElement('label');
+      label.htmlFor = c.value;
+      label.appendChild(document.createTextNode(`${c.type}: ${c.value}`));
+
+      checkboxContainer.appendChild(radio);
+      checkboxContainer.appendChild(label);
+      checkboxContainer.appendChild(document.createElement('br'));
+    });
+  }
+
+  // Always add Skip (forces explicit skip)
+  const skipRadio = document.createElement('input');
+  skipRadio.type = 'radio';
+  skipRadio.name = 'card';
+  skipRadio.value = 'Skip';
+  skipRadio.id = 'Skip';
+
   const skipLabel = document.createElement('label');
   skipLabel.htmlFor = 'Skip';
   skipLabel.appendChild(document.createTextNode('Skip'));
-  checkboxContainer.appendChild(skipCheckbox);
+
+  checkboxContainer.appendChild(skipRadio);
   checkboxContainer.appendChild(skipLabel);
   checkboxContainer.appendChild(document.createElement('br'));
 
-  // Add a submit button
+  // Submit button (disabled until selection)
   const submitButton = document.createElement('button');
   submitButton.innerText = 'Submit';
+  submitButton.disabled = true;
+
   submitButton.addEventListener('click', () => {
-    const checkboxes = document.querySelectorAll('input[type="radio"]:checked');
-    const selectedCard = Array.from(checkboxes).map(checkbox => checkbox.value);
+    const checked = document.querySelectorAll('input[type="radio"]:checked');
+    const selectedCard = Array.from(checked).map(x => x.value);
     const playerName = playerNameIndivisual;
-    console.log('Selected cards:', selectedCard);
-    // Emit the player's response to the server with player name
+
     socket.emit('playerResponse', uid, { playerName, selectedCard });
-    // Clear the checkbox container
-    // Hide the question
     document.getElementById('question').classList.add('hidden');
   });
-  // Initially disable the submit button
-  submitButton.disabled = true;
+
   checkboxContainer.appendChild(submitButton);
 
-  // Append the checkbox container to the document body
-  const host = document.getElementById('tablePane')
+  const host = document.getElementById('tablePane');
   host.appendChild(checkboxContainer);
   host.scrollTop = host.scrollHeight;
-  // document.body.appendChild(checkboxContainer);
   window.scrollTo(0, document.body.scrollHeight);
 
-
-  // Add event listeners to radio buttons to enable submit button when checked
-  const radioButtons = document.querySelectorAll('input[type="radio"]');
-  radioButtons.forEach(radio => {
-    radio.addEventListener('change', () => {
-      submitButton.disabled = false;
-    });
+  // Enable submit when ANY radio selected
+  checkboxContainer.querySelectorAll('input[type="radio"]').forEach(r => {
+    r.addEventListener('change', () => (submitButton.disabled = false));
   });
 });
 

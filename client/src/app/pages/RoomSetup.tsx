@@ -203,7 +203,7 @@ socket.emit("room:join", {
         </div>
         
         <div className="w-full">
-        <Card className="p-6 md:p-8 bg-card/80 backdrop-blur-sm w-full mt-[20px]">
+        <Card className="p-6 md:p-8 bg-card/80 backdrop-blur-sm w-full">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="create">Create Room</TabsTrigger>
@@ -217,7 +217,7 @@ socket.emit("room:join", {
                   <Label htmlFor="displayName">Your Display Name</Label>
                   <Input
                     id="displayName"
-                    placeholder="e.g., Detective Sagar"
+                    placeholder="e.g., Detective Sarah"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     className="bg-input-background"
