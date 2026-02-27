@@ -476,62 +476,63 @@ socket.emit("room:join", {
       <div className="max-w-[2000px] mx-auto space-y-4">
         {/* Header */}
         <Card className="p-4 bg-card/80 backdrop-blur-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="text-center px-3 py-1 rounded-lg bg-primary/10 border border-primary/20">
-                <p className="text-xs text-muted-foreground">Room</p>
-                <p className="text-sm font-bold text-primary">{roomCode}</p>
-                {roomName && <p className="text-xs text-muted-foreground">{roomName}</p>}
-              </div>
+  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    {/* LEFT side: Room + Turn */}
+    <div className="flex items-center gap-4">
+      <div className="text-left px-3 py-1 rounded-lg bg-primary/10 border border-primary/20">
+        <p className="text-xs text-muted-foreground">Room</p>
+        <p className="text-sm font-bold text-primary">{roomCode}</p>
+        {roomName && <p className="text-xs text-muted-foreground">{roomName}</p>}
+      </div>
 
-              <div className="flex items-center gap-2">
-                {isMyTurn ? (
-                  <Badge className="bg-gold text-gold-foreground">
-                    <Clock className="w-3 h-3 mr-1" />
-                    Your Turn
-                  </Badge>
-                ) : (
-                  <Badge variant="outline">
-                    <Clock className="w-3 h-3 mr-1" />
-                    Waiting for {currentTurnName}
-                  </Badge>
-                )}
-              </div>
-            </div>
+      <div className="flex items-center gap-2">
+        {isMyTurn ? (
+          <Badge className="bg-gold text-gold-foreground">
+            <Clock className="w-3 h-3 mr-1" />
+            Your Turn
+          </Badge>
+        ) : (
+          <Badge variant="outline">
+            <Clock className="w-3 h-3 mr-1" />
+            Waiting for {currentTurnName}
+          </Badge>
+        )}
+      </div>
+    </div>
+    <div className="mt-3 border-t border-border/30 pt-3">
+    <div className="flex justify-start gap-2 overflow-x-auto pb-2">
+      {players.map((p) => (
+        <div
+          key={p.id}
+          className={[
+            "flex items-center gap-2 rounded-lg border-2 border-[#1a9b8e]/60 bg-muted/10 px-3 py-1.5 whitespace-nowrap",
+            p.eliminated ? "opacity-50" : "",
+            p.id === myPlayerId ? "ring-2 ring-primary/25" : "",
+          ].join(" ")}
+        >
+          <span className="text-sm">{avatarEmojiById(p.avatar)}</span>
+          <span className="text-sm font-semibold">{p.name}</span>
 
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="border-primary/50">
-                <Users className="w-3 h-3 mr-1" />
-                {players.length} Players
-              </Badge>
-            </div>
-          </div>
+          {p.id === turnPlayerId && (
+            <Badge className="bg-gold text-gold-foreground">Turn</Badge>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
 
-          {/* Players in the top nav */}
-          <div className="mt-3 border-t border-border/30 pt-3">
-            <div className="flex items-center gap-2 overflow-x-auto pb-2">
-              {players.map((p) => (
-                <div
-                  key={p.id}
-                  className={[
-                    "flex items-center gap-2 rounded-lg border-2 border-[#1a9b8e]/60 bg-muted/10 px-3 py-1.5 whitespace-nowrap",
-                    p.eliminated ? "opacity-50" : "",
-                    p.id === myPlayerId ? "ring-2 ring-primary/25" : "",
-                  ].join(" ")}
-                >
-                  <span className="text-sm">{avatarEmojiById(p.avatar)}</span>
-                  <span className="text-sm font-semibold">{p.name}</span>
-                  
+    {/* RIGHT side: Player count */}
+    {/* <div className="flex items-center gap-2 justify-end">
+      <Badge variant="outline" className="border-primary/50">
+        <Users className="w-3 h-3 mr-1" />
+        {players.length} Players
+      </Badge>
+    </div> */}
+  </div>
 
-                  {p.id === turnPlayerId && <Badge className="bg-gold text-gold-foreground">Turn</Badge>}
-
-                  {/* {!p.isConnected && <Badge variant="outline">Disconnected</Badge>}
-                  {p.isReady ? <Badge>Ready</Badge> : <Badge variant="outline">Not Ready</Badge>} */}
-                </div>
-              ))}
-            </div>
-          </div>
-        </Card>
+  {/* Players in the top nav */}
+  
+</Card>
 
         {/* ✅ LAYOUT: Left (Hand+Tracker) / Right (Actions+Activity) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
