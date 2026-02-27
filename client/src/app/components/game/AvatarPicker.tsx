@@ -1,6 +1,6 @@
 import { cn } from "../ui/utils";
 
-const avatars = [
+export const avatars = [
   { id: "detective", emoji: "🕵️", label: "Detective" },
   { id: "colonel", emoji: "🎖️", label: "Colonel" },
   { id: "professor", emoji: "👨‍🏫", label: "Professor" },
@@ -10,6 +10,9 @@ const avatars = [
   { id: "doctor", emoji: "👨‍⚕️", label: "Dr. Orchid" },
   { id: "reverend", emoji: "👴", label: "Reverend" },
 ];
+
+export const avatarEmojiById = (id?: string) =>
+  avatars.find((a) => a.id === id)?.emoji ?? "🕵️";
 
 interface AvatarPickerProps {
   selected: string;

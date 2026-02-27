@@ -10,6 +10,7 @@ let playerNameIndivisual;
 let playerName;
 let assumption;
 let gameUid;
+let recievedCards = []; // cards in THIS player's hand (used to show only valid options)
 
 // Combine all cards
 const allCardNames = [...suspects, ...weapons, ...gameRooms];
@@ -384,28 +385,33 @@ socket.on('promptPlayer', (prompt) => {
     window.checkboxContainer.parentNode.removeChild(window.checkboxContainer);
   }
 
-  // Create a div element to hold the radios
+  // Create a div element to hold the checkboxes
   checkboxContainer = document.createElement('div');
   window.checkboxContainer = checkboxContainer;
 
+  // Add a class to the container for styling
   checkboxContainer.classList.add('checkbox-container');
-  document.getElementById('reply').innerHTML = '';
-  document.getElementById('reply1').innerHTML = '';
+  document.getElementById('reply').innerHTML ='';
+  document.getElementById('reply1').innerHTML='';
+  // document.getElementById('assumptions').innerHTML='';
 
+
+  // Create radio options ONLY for cards the player actually has.
+  // If they have none, we still show the prompt and force an explicit "Skip".
   document.getElementById('question').classList.remove('hidden');
 
-  // Instruction
+  // Helpful instruction at the top
   const instruction = document.createElement('div');
   instruction.classList.add('prompt-instruction');
   instruction.innerHTML = '<strong>Your turn to respond:</strong> pick a card you can show, or select <em>Skip</em>.';
   checkboxContainer.appendChild(instruction);
   checkboxContainer.appendChild(document.createElement('br'));
 
-  // Prompt cards
+  // Map prompt keys to nice labels
   const promptCards = [
     { type: 'Suspect', value: prompt.suspect },
     { type: 'Weapon', value: prompt.weapon },
-    { type: 'Room',   value: prompt.room }
+    { type: 'Room', value: prompt.room }
   ];
 
   // Only show options the player owns
@@ -419,61 +425,67 @@ socket.on('promptPlayer', (prompt) => {
     checkboxContainer.appendChild(document.createElement('br'));
   } else {
     ownedMatches.forEach(c => {
-      const radio = document.createElement('input');
-      radio.type = 'radio';
-      radio.name = 'card';
-      radio.value = c.value;
-      radio.id = c.value;
+      const checkbox = document.createElement('input');
+      checkbox.type = 'radio';
+      checkbox.name = 'card';
+      checkbox.value = c.value;
+      checkbox.id = c.value;
 
       const label = document.createElement('label');
       label.htmlFor = c.value;
       label.appendChild(document.createTextNode(`${c.type}: ${c.value}`));
 
-      checkboxContainer.appendChild(radio);
+      checkboxContainer.appendChild(checkbox);
       checkboxContainer.appendChild(label);
       checkboxContainer.appendChild(document.createElement('br'));
     });
   }
 
-  // Always add Skip (forces explicit skip)
-  const skipRadio = document.createElement('input');
-  skipRadio.type = 'radio';
-  skipRadio.name = 'card';
-  skipRadio.value = 'Skip';
-  skipRadio.id = 'Skip';
-
+  // Add a "Skip" option
+  const skipCheckbox = document.createElement('input');
+  skipCheckbox.type = 'radio';
+  skipCheckbox.name = 'card';
+  skipCheckbox.value = 'Skip';
+  skipCheckbox.id = 'Skip';
   const skipLabel = document.createElement('label');
   skipLabel.htmlFor = 'Skip';
   skipLabel.appendChild(document.createTextNode('Skip'));
-
-  checkboxContainer.appendChild(skipRadio);
+  checkboxContainer.appendChild(skipCheckbox);
   checkboxContainer.appendChild(skipLabel);
   checkboxContainer.appendChild(document.createElement('br'));
 
-  // Submit button (disabled until selection)
+  // Add a submit button
   const submitButton = document.createElement('button');
   submitButton.innerText = 'Submit';
-  submitButton.disabled = true;
-
   submitButton.addEventListener('click', () => {
-    const checked = document.querySelectorAll('input[type="radio"]:checked');
-    const selectedCard = Array.from(checked).map(x => x.value);
+    const checkboxes = document.querySelectorAll('input[type="radio"]:checked');
+    const selectedCard = Array.from(checkboxes).map(checkbox => checkbox.value);
     const playerName = playerNameIndivisual;
-
+    console.log('Selected cards:', selectedCard);
+    // Emit the player's response to the server with player name
     socket.emit('playerResponse', uid, { playerName, selectedCard });
+    // Clear the checkbox container
+    // Hide the question
     document.getElementById('question').classList.add('hidden');
   });
-
+  // Initially disable the submit button
+  submitButton.disabled = true;
   checkboxContainer.appendChild(submitButton);
 
-  const host = document.getElementById('tablePane');
+  // Append the checkbox container to the document body
+  const host = document.getElementById('tablePane')
   host.appendChild(checkboxContainer);
   host.scrollTop = host.scrollHeight;
+  // document.body.appendChild(checkboxContainer);
   window.scrollTo(0, document.body.scrollHeight);
 
-  // Enable submit when ANY radio selected
-  checkboxContainer.querySelectorAll('input[type="radio"]').forEach(r => {
-    r.addEventListener('change', () => (submitButton.disabled = false));
+
+  // Add event listeners to radio buttons to enable submit button when checked
+  const radioButtons = document.querySelectorAll('input[type="radio"]');
+  radioButtons.forEach(radio => {
+    radio.addEventListener('change', () => {
+      submitButton.disabled = false;
+    });
   });
 });
 
@@ -482,7 +494,17 @@ socket.on('promptPlayer', (prompt) => {
 // Event listener for player response to the prompt
 socket.on('playerResponseAll', (data) => {
   console.log('Received player response:', data.playerName);
-  document.getElementById('reply').innerHTML = `<strong>${data.playerName}</strong> has showed a card`
+
+  // Backwards compatible: older server sends only { playerName }
+  // Newer server can send { action: 'skip' } or { card: 'Skip' } or { selectedCard: ['Skip'] }
+  const action = data?.action;
+  const card = Array.isArray(data?.selectedCard) ? data.selectedCard[0] : data?.card;
+
+  if (action === 'skip' || card === 'Skip') {
+    document.getElementById('reply').innerHTML = `<strong>${data.playerName}</strong> skipped`;
+  } else {
+    document.getElementById('reply').innerHTML = `<strong>${data.playerName}</strong> has showed a card`;
+  }
 
 
   // Handle the player's response as needed
@@ -491,11 +513,16 @@ socket.on('playerResponseAll', (data) => {
 
 socket.on('playerResponse', (data) => {
   console.log('Received player response:', data.playerName,data.card);
-  if (data.card === 'undefined'){
-      document.getElementById('reply1').innerHTML = `No one has a clue`
-  }else{
-  document.getElementById('reply1').innerHTML = `<strong>${data.playerName}</strong> has ${data.card}`
-}
+
+  const card = Array.isArray(data?.selectedCard) ? data.selectedCard[0] : data?.card;
+
+  if (card === 'Skip') {
+    document.getElementById('reply1').innerHTML = `<strong>${data.playerName}</strong> skipped`;
+  } else if (card === 'undefined' || typeof card === 'undefined') {
+    document.getElementById('reply1').innerHTML = `No one has a clue`;
+  } else {
+    document.getElementById('reply1').innerHTML = `<strong>${data.playerName}</strong> has ${card}`;
+  }
 
   // Handle the player's response as needed
   // For example, update UI to display the response

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Card } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
+import { avatarEmojiById } from "../components/game/AvatarPicker"; 
 import {
   Select,
   SelectContent,
@@ -21,16 +22,17 @@ import {
   DialogTitle,
 } from "../components/ui/dialog";
 import { Label } from "../components/ui/label";
-import { PlayerCard } from "../components/game/PlayerCard";
-import { CardTrackerRow } from "../components/game/CardTrackerRow";
 import { PlayingCard } from "../components/game/PlayingCard";
 import { ActivityLog } from "../components/game/ActivityLog";
 import { GameTips } from "../components/game/GameTips";
-import { Search, Filter, Users, Clock, MessageSquare, Trophy } from "lucide-react";
+import { Search, Users, Clock, Trophy, CircleCheck, CircleX, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
 import { ensureConnected } from "../lib/socket";
 
-// Game data (must match server)
+
+
+// ─── Game data (must match server) ───────────────────────────────────────────
+
 const suspects = [
   "Miss Scarlet",
   "Colonel Mustard",
@@ -54,15 +56,30 @@ const rooms = [
   "Study",
 ];
 
-interface CardState {
-  name: string;
-  category: "suspect" | "weapon" | "room";
-  selected: boolean;
-  seen: boolean;
-  notPossible: boolean;
-  note: string;
-}
+// Static row groupings — defined outside the component to avoid re-creation on every render.
+const ROW_GROUPS = [
+  { label: "SUSPECTS", items: suspects },
+  { label: "WEAPONS", items: weapons },
+  { label: "ROOMS", items: rooms },
+] as const;
 
+type CellMark = "" | "check" | "x" | "maybe";
+type TrackerGrid = Record<string, Record<string, CellMark>>; // cardName -> playerId -> mark
+
+const markCycle: Record<CellMark, CellMark> = {
+  "": "check",
+  check: "x",
+  x: "maybe",
+  maybe: "",
+};
+
+// Icons use CSS currentColor via className so they respect the theme
+const MARK_ICON: Record<CellMark, JSX.Element | null> = {
+  "": null,
+  check: <CircleCheck strokeWidth={2} className="w-11 h-11 text-emerald-400" />,
+  x: <CircleX strokeWidth={2} className="w-11 h-11 text-destructive" />,
+  maybe: <HelpCircle strokeWidth={2} className="w-11 h-11 text-gold" />,
+};
 interface Player {
   id: string;
   name: string;
@@ -97,36 +114,12 @@ export function GameRoom() {
 
   const [roomName, setRoomName] = useState(sessionStorage.getItem("roomName") || "");
   const [players, setPlayers] = useState<Player[]>([]);
+  const playersRef = useRef<Player[]>([]);
   const [myPlayerId, setMyPlayerId] = useState(sessionStorage.getItem("playerId") || "");
   const [turnPlayerId, setTurnPlayerId] = useState<string>("");
 
-  // Card tracking
-  const [cards, setCards] = useState<CardState[]>(() => [
-    ...suspects.map((name) => ({
-      name,
-      category: "suspect" as const,
-      selected: false,
-      seen: false,
-      notPossible: false,
-      note: "",
-    })),
-    ...weapons.map((name) => ({
-      name,
-      category: "weapon" as const,
-      selected: false,
-      seen: false,
-      notPossible: false,
-      note: "",
-    })),
-    ...rooms.map((name) => ({
-      name,
-      category: "room" as const,
-      selected: false,
-      seen: false,
-      notPossible: false,
-      note: "",
-    })),
-  ]);
+  // Card tracking grid (local to this player)
+  const [trackerGrid, setTrackerGrid] = useState<TrackerGrid>({});
 
   const [myHand, setMyHand] = useState<HandCard[]>([]);
   const myHandNamesRef = useRef<string[]>([]);
@@ -134,8 +127,6 @@ export function GameRoom() {
 
   // UI
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterCategory, setFilterCategory] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
 
   // Actions
   const [askDialogOpen, setAskDialogOpen] = useState(false);
@@ -151,6 +142,8 @@ export function GameRoom() {
   const [promptFrom, setPromptFrom] = useState<{ id: string; name: string } | null>(null);
   const [promptAssumption, setPromptAssumption] = useState<Assumption | null>(null);
   const [promptMatches, setPromptMatches] = useState<string[]>([]);
+  // When true, prevent closing the dialog until the player actively responds (show a card or skip)
+  const [awaitingPromptResponse, setAwaitingPromptResponse] = useState(false);
 
   // Winner
   const [winnerDialogOpen, setWinnerDialogOpen] = useState(false);
@@ -161,7 +154,6 @@ export function GameRoom() {
 
   const me = useMemo(() => players.find((p) => p.id === myPlayerId) || null, [players, myPlayerId]);
   const isSpectator = !!me?.eliminated;
-
   const isMyTurn = !!turnPlayerId && turnPlayerId === myPlayerId;
 
   const addActivity = (type: Activity["type"], playerName: string, description: string) => {
@@ -178,6 +170,51 @@ export function GameRoom() {
   };
 
   useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
+
+  const trackerStorageKey = useMemo(() => {
+    if (!roomCode || !myPlayerId) return "";
+    return `clue:tracker:${String(roomCode).toUpperCase()}:${myPlayerId}`;
+  }, [roomCode, myPlayerId]);
+
+  // Load tracker from localStorage when key becomes available
+  useEffect(() => {
+    if (!trackerStorageKey) return;
+    try {
+      const raw = localStorage.getItem(trackerStorageKey);
+      if (raw) setTrackerGrid(JSON.parse(raw));
+    } catch {
+      // ignore
+    }
+  }, [trackerStorageKey]);
+
+  // Persist tracker changes
+  useEffect(() => {
+    if (!trackerStorageKey) return;
+    try {
+      localStorage.setItem(trackerStorageKey, JSON.stringify(trackerGrid));
+    } catch {
+      // ignore
+    }
+  }, [trackerStorageKey, trackerGrid]);
+
+  const setCellMark = (cardName: string, playerId: string, next: CellMark) => {
+    setTrackerGrid((prev) => ({
+      ...prev,
+      [cardName]: {
+        ...(prev[cardName] || {}),
+        [playerId]: next,
+      },
+    }));
+  };
+
+  const cycleCellMark = (cardName: string, playerId: string) => {
+    const current: CellMark = trackerGrid?.[cardName]?.[playerId] || "";
+    setCellMark(cardName, playerId, markCycle[current]);
+  };
+
+  useEffect(() => {
     if (!roomCode) return;
 
     const displayName = sessionStorage.getItem("playerName") || "";
@@ -191,6 +228,8 @@ export function GameRoom() {
     const socket = ensureConnected();
 
     const onJoined = (data: any) => {
+      if (data?.sessionId) sessionStorage.setItem("sessionId", String(data.sessionId)); // ✅ add
+
       const pid = String(data.playerId || socket.id);
       setMyPlayerId(pid);
       myIdRef.current = pid;
@@ -199,7 +238,6 @@ export function GameRoom() {
       setRoomName(String(data.roomName || ""));
 
       if (!data.started) {
-        // If someone navigated to game before start
         toast.info("Game hasn't started yet. Redirecting to lobby...");
         navigate(`/lobby/${String(data.roomCode || roomCode)}`);
       }
@@ -232,11 +270,7 @@ export function GameRoom() {
       const fromName = String(data.fromPlayerName || "Player");
       const a = data.assumption as Assumption;
       const targetText = data.targetPlayerName ? ` (to ${String(data.targetPlayerName)})` : "";
-      addActivity(
-        "ask",
-        fromName,
-        `Suggested${targetText}: ${a?.suspect}, ${a?.weapon}, ${a?.room}`
-      );
+      addActivity("ask", fromName, `Suggested${targetText}: ${a?.suspect}, ${a?.weapon}, ${a?.room}`);
     };
 
     const onPrompt = (data: any) => {
@@ -251,24 +285,21 @@ export function GameRoom() {
       setPromptAssumption(a);
       setPromptMatches(matches);
 
-      if (matches.length === 0) {
-        // Auto-skip
-        addActivity("show", "System", `You had no matching cards for ${fromName}'s suggestion`);
-        socket.emit("game:showCard", { roomCode: String(roomCode).toUpperCase(), cardName: null });
-        toast.info("No matching cards — you passed.");
-        return;
-      }
-
+      setAwaitingPromptResponse(true);
       setShowCardDialogOpen(true);
+
+      if (matches.length === 0) {
+        addActivity("show", "System", `You have no matching cards for ${fromName}'s suggestion — please click Skip`);
+        toast.info("No matching cards — please click Skip.");
+      } else {
+        addActivity("show", "System", `You can show a card to ${fromName}`);
+      }
     };
 
     const onCardShown = (data: any) => {
       const fromName = String(data.fromPlayerName || "No one");
-      if (fromName === "No one") {
-        addActivity("show", "System", "No one could show a card.");
-      } else {
-        addActivity("show", "System", `${fromName} showed a card.`);
-      }
+      if (fromName === "No one") addActivity("show", "System", "No one could show a card.");
+      else addActivity("show", "System", `${fromName} showed a card.`);
     };
 
     const onCardRevealed = (data: any) => {
@@ -277,8 +308,16 @@ export function GameRoom() {
       addActivity("show", "System", `${fromName} revealed: ${cardName}`);
       toast.success(`You saw: ${cardName}`);
 
-      // Auto-mark it as seen in tracker
-      setCards((prev) => prev.map((c) => (c.name === cardName ? { ...c, seen: true } : c)));
+      const pid = playersRef.current.find((p) => p.name === fromName)?.id;
+      if (pid) {
+        setTrackerGrid((prev) => ({
+          ...prev,
+          [cardName]: {
+            ...(prev[cardName] || {}),
+            [pid]: "check",
+          },
+        }));
+      }
     };
 
     const onEliminated = (data: any) => {
@@ -295,17 +334,12 @@ export function GameRoom() {
       setWinnerDialogOpen(true);
     };
 
-    const onInvalidShow = (data: any) => {
-      toast.error(data?.message || "Invalid response");
-    };
-
-    const onRoomError = (err: any) => {
-      toast.error(err?.message || "Something went wrong");
-    };
+    const onInvalidShow = (data: any) => toast.error(data?.message || "Invalid response");
+    const onRoomError = (err: any) => toast.error(err?.message || "Something went wrong");
 
     socket.off("room:joined").on("room:joined", onJoined);
     socket.off("game:players").on("game:players", onPlayers);
-    socket.off("lobby:state").on("lobby:state", onPlayers); // also works
+    socket.off("lobby:state").on("lobby:state", onPlayers);
     socket.off("game:hand").on("game:hand", onHand);
     socket.off("game:turn").on("game:turn", onTurn);
     socket.off("game:assumption").on("game:assumption", onAssumption);
@@ -317,12 +351,18 @@ export function GameRoom() {
     socket.off("game:showCard:invalid").on("game:showCard:invalid", onInvalidShow);
     socket.off("room:error").on("room:error", onRoomError);
 
-    // Join to ensure we receive state
-    socket.emit("room:join", {
-      roomCode: String(roomCode).toUpperCase(),
-      playerName: displayName,
-      playerAvatar: avatar,
-    });
+const sid =
+  sessionStorage.getItem("sessionId") ??
+  (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+
+sessionStorage.setItem("sessionId", sid);
+
+socket.emit("room:join", {
+  roomCode: String(roomCode).toUpperCase(),
+  playerName: displayName,
+  playerAvatar: avatar,
+  sessionId: sid, // ✅ add
+});
 
     addActivity("game", "System", "Connected to game room");
 
@@ -344,22 +384,7 @@ export function GameRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomCode]);
 
-  const filteredCards = useMemo(() => {
-    return cards.filter((card) => {
-      const matchesSearch = card.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = filterCategory === "all" || card.category === filterCategory;
-      const matchesStatus =
-        filterStatus === "all" ||
-        (filterStatus === "unmarked" && !card.selected && !card.seen && !card.notPossible) ||
-        (filterStatus === "seen" && card.seen) ||
-        (filterStatus === "not-possible" && card.notPossible);
-      return matchesSearch && matchesCategory && matchesStatus;
-    });
-  }, [cards, searchQuery, filterCategory, filterStatus]);
-
-  const handleCardUpdate = (cardName: string, updates: Partial<CardState>) => {
-    setCards((prev) => prev.map((card) => (card.name === cardName ? { ...card, ...updates } : card)));
-  };
+  const trackerPlayers = useMemo(() => players, [players]);
 
   const handleAsk = () => {
     if (!roomCode) return;
@@ -395,7 +420,7 @@ export function GameRoom() {
     setSelectedRoom("");
   };
 
-  const handleShowCard = (cardName: string) => {
+  const handleShowCard = (cardName: string | null) => {
     if (!roomCode) return;
     const socket = ensureConnected();
 
@@ -404,10 +429,15 @@ export function GameRoom() {
       cardName,
     });
 
-    addActivity("show", me?.name || "You", `Showed a card to ${promptFrom?.name || "another player"}`);
-
-    toast.success("Card shown (only the asker can see which card)");
+    if (cardName) {
+      addActivity("show", me?.name || "You", `Showed a card to ${promptFrom?.name || "another player"}`);
+      toast.success("Card shown (only the asker can see which card)");
+    } else {
+      addActivity("show", me?.name || "You", `Skipped (no matching cards) for ${promptFrom?.name || "another player"}`);
+      toast.info("Skipped.");
+    }
     setShowCardDialogOpen(false);
+    setAwaitingPromptResponse(false);
     setPromptFrom(null);
     setPromptAssumption(null);
     setPromptMatches([]);
@@ -444,6 +474,7 @@ export function GameRoom() {
   return (
     <div className="min-h-screen p-2 md:p-4 bg-gradient-to-br from-background via-background to-muted/20">
       <div className="max-w-[2000px] mx-auto space-y-4">
+        {/* Header */}
         <Card className="p-4 bg-card/80 backdrop-blur-sm">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -475,53 +506,80 @@ export function GameRoom() {
               </Badge>
             </div>
           </div>
+
+          {/* Players in the top nav */}
+          <div className="mt-3 border-t border-border/30 pt-3">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+              {players.map((p) => (
+                <div
+                  key={p.id}
+                  className={[
+                    "flex items-center gap-2 rounded-lg border-2 border-[#1a9b8e]/60 bg-muted/10 px-3 py-1.5 whitespace-nowrap",
+                    p.eliminated ? "opacity-50" : "",
+                    p.id === myPlayerId ? "ring-2 ring-primary/25" : "",
+                  ].join(" ")}
+                >
+                  <span className="text-sm">{avatarEmojiById(p.avatar)}</span>
+                  <span className="text-sm font-semibold">{p.name}</span>
+                  
+
+                  {p.id === turnPlayerId && <Badge className="bg-gold text-gold-foreground">Turn</Badge>}
+
+                  {/* {!p.isConnected && <Badge variant="outline">Disconnected</Badge>}
+                  {p.isReady ? <Badge>Ready</Badge> : <Badge variant="outline">Not Ready</Badge>} */}
+                </div>
+              ))}
+            </div>
+          </div>
         </Card>
 
+        {/* ✅ LAYOUT: Left (Hand+Tracker) / Right (Actions+Activity) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          {/* Players */}
-          <div className="lg:col-span-3 space-y-4">
+          {/* LEFT */}
+          <div className="lg:col-span-9 space-y-4">
+            {/* My Hand (TOP) */}
             <Card className="p-4 bg-card/80 backdrop-blur-sm">
-              <h3 className="font-semibold mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" /> Players
-              </h3>
-              <div className="space-y-3">
-                {players.map((player) => (
-                  <PlayerCard
-                    key={player.id}
-                    player={player}
-                    isCurrentPlayer={player.id === myPlayerId}
-                    showTurnIndicator
-                    isCurrentTurn={player.id === turnPlayerId}
-                    lastAction={player.eliminated ? "Eliminated" : undefined}
-                    showNotesIcon
-                  />
-                ))}
-              </div>
-            </Card>
-
-            <Card className="p-4 bg-card/80 backdrop-blur-sm">
-              <h3 className="font-semibold mb-4">My Hand</h3>
+              <h3 className="font-semibold mb-3">My Hand</h3>
               {myHand.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Waiting for cards...</p>
               ) : (
-                <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
                   {myHand.map((card, index) => (
-                    <PlayingCard key={index} card={card} />
+                    <div key={index} className="min-w-[220px]">
+                      <PlayingCard card={card} />
+                    </div>
                   ))}
                 </div>
               )}
             </Card>
-          </div>
 
-          {/* Tracker */}
-          <div className="lg:col-span-6 space-y-4">
             <GameTips />
 
+            {/* Tracker (BELOW hand) */}
             <Card className="p-4 bg-card/80 backdrop-blur-sm">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3 mb-3">
                   <h2 className="text-xl font-semibold">Card Tracker</h2>
-                  <Badge variant="outline">{cards.filter((c) => c.seen).length} Seen</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="hidden sm:inline-flex">
+                      Click a cell to cycle: ✔️ → ✖️ → 🟡
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setTrackerGrid({});
+                        try {
+                          if (trackerStorageKey) localStorage.removeItem(trackerStorageKey);
+                        } catch {
+                          // ignore
+                        }
+                        toast.info("Card tracker cleared");
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -534,106 +592,153 @@ export function GameRoom() {
                       className="pl-10 bg-input-background"
                     />
                   </div>
-                  <Select value={filterCategory} onValueChange={setFilterCategory}>
-                    <SelectTrigger className="w-full sm:w-40 bg-input-background">
-                      <Filter className="w-4 h-4 mr-2" />
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      <SelectItem value="suspect">Suspects</SelectItem>
-                      <SelectItem value="weapon">Weapons</SelectItem>
-                      <SelectItem value="room">Rooms</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-full sm:w-40 bg-input-background">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="unmarked">Unmarked</SelectItem>
-                      <SelectItem value="seen">Seen</SelectItem>
-                      <SelectItem value="not-possible">Not Possible</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Badge variant="outline" className="sm:hidden justify-center">
+                    Tap a cell to cycle: ✔️ → ✖️ → 🟡
+                  </Badge>
                 </div>
 
                 <ScrollArea className="h-[600px]">
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-2">SUSPECTS</h3>
-                      <div className="space-y-1">
-                        {filteredCards
-                          .filter((c) => c.category === "suspect")
-                          .map((card) => (
-                            <CardTrackerRow
-                              key={card.name}
-                              card={card}
-                              onUpdate={(updates) => handleCardUpdate(card.name, updates)}
-                            />
+                  <div className="-mx-4 px-4 overflow-x-auto overscroll-x-contain">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr>
+                          <th className="sticky top-0 left-0 z-30 bg-card/95 backdrop-blur border border-border/30 px-3 py-2 text-left font-semibold">
+                            Card
+                          </th>
+                          {trackerPlayers.map((p) => (
+                            <th
+                              key={p.id}
+                              className="sticky top-0 z-20 bg-card/95 backdrop-blur border border-border/30 px-3 py-2 text-center font-semibold whitespace-nowrap"
+                            >
+                              <span className={p.eliminated ? "opacity-50" : ""}>{p.name}</span>
+                            </th>
                           ))}
-                      </div>
-                    </div>
+                        </tr>
+                      </thead>
 
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-2">WEAPONS</h3>
-                      <div className="space-y-1">
-                        {filteredCards
-                          .filter((c) => c.category === "weapon")
-                          .map((card) => (
-                            <CardTrackerRow
-                              key={card.name}
-                              card={card}
-                              onUpdate={(updates) => handleCardUpdate(card.name, updates)}
-                            />
-                          ))}
-                      </div>
-                    </div>
+                      <tbody>
+                        {ROW_GROUPS.map((group) => {
+                          const tone =
+                            group.label === "SUSPECTS"
+                              ? {
+                                  header: " border-l-4 border-emerald-500/30",
+                                  row: "bg-card/30 backdrop-blur-sm hover:bg-muted/20 border-border/50 transition-all",
+                                  sticky: "bg-card/40 backdrop-blur-sm",
+                                }
+                              : group.label === "WEAPONS"
+                              ? {
+                                  header: " border-l-4 border-sky-500/30",
+                                  row: "bg-card/30 backdrop-blur-sm hover:bg-muted/20 border-border/50 transition-all",
+                                  sticky: "bg-card/40 backdrop-blur-sm",
+                                }
+                              : {
+                                  header: " border-l-4 border-amber-500/30",
+                                  row: "bg-card/30 backdrop-blur-sm hover:bg-muted/20 border-border/50 transition-all",
+                                  sticky: "bg-card/40 backdrop-blur-sm",
+                                };
 
-                    <div>
-                      <h3 className="text-sm font-semibold text-muted-foreground mb-2 px-2">ROOMS</h3>
-                      <div className="space-y-1">
-                        {filteredCards
-                          .filter((c) => c.category === "room")
-                          .map((card) => (
-                            <CardTrackerRow
-                              key={card.name}
-                              card={card}
-                              onUpdate={(updates) => handleCardUpdate(card.name, updates)}
-                            />
-                          ))}
-                      </div>
-                    </div>
+                          const items = group.items.filter((name) =>
+                            name.toLowerCase().includes(searchQuery.toLowerCase())
+                          );
+                          if (items.length === 0) return null;
+
+                          return (
+                            <Fragment key={group.label}>
+                              <tr>
+                                <td
+                                  colSpan={trackerPlayers.length + 1}
+                                  className={`sticky left-0 z-10 border border-border/30 px-3 py-2 text-xs font-semibold text-muted-foreground tracking-widest uppercase ${tone.header}`}
+                                >
+                                  {group.label}
+                                </td>
+                              </tr>
+
+                              {items.map((cardName) => (
+                                <tr key={cardName} className={tone.row}>
+                                  <td
+                                    className={`sticky left-0 z-10 border border-border/30 px-3 py-2 font-medium whitespace-nowrap ${tone.sticky}`}
+                                  ><span
+    className={
+      group.label === "SUSPECTS"
+        ? "text-primary"
+        : group.label === "WEAPONS"
+        ? "text-[#e67272]"
+        : "text-gold"
+    }
+  >
+                                    {cardName}
+                                    </span>
+                                  </td>
+                                  {trackerPlayers.map((p) => {
+                                    const current: CellMark = trackerGrid?.[cardName]?.[p.id] ?? "";
+                                    return (
+                                      <td
+                                        key={`${cardName}-${p.id}`}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => cycleCellMark(cardName, p.id)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            cycleCellMark(cardName, p.id);
+                                          }
+                                        }}
+                                        aria-label={`Mark ${cardName} for ${p.name}`}
+                                        className="border border-border/30 p-0 cursor-pointer hover:bg-muted/30 transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary/30"
+                                      >
+                                        <div className="w-full h-full min-h-[52px] min-w-[64px] grid place-items-center">
+                                          <span className={p.eliminated ? "opacity-40" : ""}>
+                                            {MARK_ICON[current]}
+                                          </span>
+                                        </div>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+
+                    {trackerPlayers.length === 0 && (
+                      <p className="text-sm text-muted-foreground px-2 py-3">Waiting for players...</p>
+                    )}
                   </div>
                 </ScrollArea>
               </div>
             </Card>
           </div>
 
-          {/* Actions & Activity */}
+          {/* RIGHT */}
           <div className="lg:col-span-3 space-y-4">
             <Card className="p-4 bg-card/80 backdrop-blur-sm">
               <h3 className="font-semibold mb-4">Actions</h3>
               <div className="space-y-2">
-                <Button onClick={() => setAskDialogOpen(true)} disabled={!isMyTurn || isSpectator} className="w-full">
-  Ask / Suggest
-</Button>
-
-<Button variant="outline" disabled={!isMyTurn || isSpectator} className="w-full" onClick={() => setAccuseDialogOpen(true)}>
-  Make Accusation
-</Button>
-{isSpectator ? (
-  <p className="text-xs text-muted-foreground mt-3">
-    You are spectating (eliminated). You can still view updates, but cannot make moves.
-  </p>
-) : !isMyTurn ? (
-  <p className="text-xs text-muted-foreground mt-3">You can only act on your turn.</p>
-) : null}
+                <Button
+                  onClick={() => setAskDialogOpen(true)}
+                  disabled={!isMyTurn || isSpectator}
+                  className="w-full"
+                >
+                  Ask / Suggest
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={!isMyTurn || isSpectator}
+                  className="w-full"
+                  onClick={() => setAccuseDialogOpen(true)}
+                >
+                  Make Accusation
+                </Button>
+                {isSpectator ? (
+                  <p className="text-xs text-muted-foreground mt-3">
+                    You are spectating (eliminated). You can still view updates, but cannot make moves.
+                  </p>
+                ) : !isMyTurn ? (
+                  <p className="text-xs text-muted-foreground mt-3">You can only act on your turn.</p>
+                ) : null}
               </div>
-              {!isMyTurn && (
-                <p className="text-xs text-muted-foreground mt-3">You can only act on your turn.</p>
-              )}
             </Card>
 
             <Card className="p-4 bg-card/80 backdrop-blur-sm">
@@ -804,39 +909,55 @@ export function GameRoom() {
       </Dialog>
 
       {/* Show card dialog */}
-      <Dialog open={showCardDialogOpen} onOpenChange={setShowCardDialogOpen}>
+      <Dialog
+        open={showCardDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && awaitingPromptResponse) return;
+          setShowCardDialogOpen(open);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Show a Card</DialogTitle>
             <DialogDescription>
-              {promptFrom?.name || "Someone"} is asking about {promptAssumption?.suspect}, {promptAssumption?.weapon}, {promptAssumption?.room}.
-              Choose one matching card to reveal.
+              {promptFrom?.name || "Someone"} is asking about {promptAssumption?.suspect},{" "}
+              {promptAssumption?.weapon}, {promptAssumption?.room}.
+              {promptMatches.length === 0
+                ? " You have no matching cards — please click Skip to continue."
+                : " Choose one matching card to reveal."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-4">
             <p className="text-sm text-muted-foreground">🔒 Only the asker will see which card you reveal.</p>
 
-            {promptMatches.map((name) => (
+            {promptMatches.length > 0 ? (
+              promptMatches.map((name) => (
+                <Button
+                  key={name}
+                  variant="outline"
+                  className="w-full justify-start h-auto py-3"
+                  onClick={() => handleShowCard(name)}
+                >
+                  <div className="text-left">
+                    <div className="font-semibold">{name}</div>
+                    <div className="text-xs text-muted-foreground capitalize">{categorize(name)}</div>
+                  </div>
+                </Button>
+              ))
+            ) : (
               <Button
-                key={name}
                 variant="outline"
                 className="w-full justify-start h-auto py-3"
-                onClick={() => handleShowCard(name)}
+                onClick={() => handleShowCard(null)}
               >
                 <div className="text-left">
-                  <div className="font-semibold">{name}</div>
-                  <div className="text-xs text-muted-foreground capitalize">{categorize(name)}</div>
+                  <div className="font-semibold">Skip</div>
+                  <div className="text-xs text-muted-foreground">I can't show any of these cards</div>
                 </div>
               </Button>
-            ))}
+            )}
           </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCardDialogOpen(false)}>
-              Cancel
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

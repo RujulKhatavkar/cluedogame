@@ -5,7 +5,6 @@ import { X, Lightbulb } from "lucide-react";
 
 const tips = [
   "💡 Mark cards you've seen as 'Seen' to eliminate them from the solution.",
-  "📝 Use notes to remember which player showed you which card.",
   "🔍 Cards in your hand can't be in the solution - mark them as 'Seen'.",
   "⚡ Use the search and filters to quickly find specific cards.",
   "🎯 Make an accusation only when you're 100% certain!",
