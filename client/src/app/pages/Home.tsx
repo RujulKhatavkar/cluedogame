@@ -26,7 +26,7 @@ export function Home() {
           </div>
           
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
-            Who<span className="text-primary">DunItr</span>
+            Who<span className="text-primary">DunIt</span> 
           </h1>
           
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
