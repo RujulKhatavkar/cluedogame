@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, JSX, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Card } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -25,7 +25,7 @@ import { Label } from "../components/ui/label";
 import { PlayingCard } from "../components/game/PlayingCard";
 import { ActivityLog } from "../components/game/ActivityLog";
 import { GameTips } from "../components/game/GameTips";
-import { Search, Users, Clock, Trophy, CircleCheck, CircleX, HelpCircle } from "lucide-react";
+import { Search, Users, Clock, Trophy, CircleCheck, CircleX, HelpCircle, Bot } from "lucide-react";
 import { toast } from "sonner";
 import { ensureConnected } from "../lib/socket";
 
@@ -88,6 +88,8 @@ interface Player {
   isReady: boolean;
   isConnected: boolean;
   eliminated?: boolean;
+  isBot?: boolean;
+  botDifficulty?: string | null;
 }
 
 interface Activity {

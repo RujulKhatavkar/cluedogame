@@ -1,6 +1,6 @@
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
-import { Crown, UserMinus, CheckCircle2, Circle } from "lucide-react";
+import { Crown, UserMinus, CheckCircle2, Circle, Bot } from "lucide-react";
 
 interface Player {
   id: string;
@@ -9,6 +9,8 @@ interface Player {
   isHost: boolean;
   isReady: boolean;
   isConnected: boolean;
+  isBot?: boolean;
+  botDifficulty?: string | null;
 }
 
 interface PlayerCardProps {
@@ -65,51 +67,54 @@ export function PlayerCard({
 
         {/* Player Info */}
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">
-              {player.name}
-              {isCurrentPlayer && " (You)"}
-            </span>
-            {player.isHost && (
-              <Crown className="w-4 h-4 text-gold" title="Host" />
-            )}
-          </div>
+  <div className="flex items-center gap-2 flex-wrap">
+    <span className="font-semibold">
+      {player.name}
+      {isCurrentPlayer && !player.isBot && " (You)"}
+    </span>
+    {player.isHost && (
+      <span title="Host">
+        <Crown className="w-4 h-4 text-gold" />
+      </span>
+    )}
+    {player.isBot && (
+      <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+        <Bot className="w-3 h-3 mr-1" />
+        AI · {player.botDifficulty || "hard"}
+      </Badge>
+    )}
+  </div>
 
-          <div className="flex items-center gap-2">
-            {/* Connection Status */}
-            <Badge
-              variant={player.isConnected ? "default" : "secondary"}
-              className={`text-xs ${
-                player.isConnected
-                  ? "bg-primary/20 text-primary border-primary/30"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {player.isConnected ? "Connected" : "Disconnected"}
-            </Badge>
+  <div className="flex items-center gap-2 flex-wrap">
+    <Badge
+      variant={player.isConnected ? "default" : "secondary"}
+      className={`text-xs ${
+        player.isConnected
+          ? "bg-green-500/10 text-green-500 border-green-500/20"
+          : "bg-muted text-muted-foreground"
+      }`}
+    >
+      {player.isConnected ? "Connected" : "Disconnected"}
+    </Badge>
 
-            {/* Ready Status */}
-            {player.isReady ? (
-              <Badge
-                variant="default"
-                className="text-xs bg-primary text-primary-foreground"
-              >
-                <CheckCircle2 className="w-3 h-3 mr-1" />
-                Ready
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="text-xs">
-                <Circle className="w-3 h-3 mr-1" />
-                Not Ready
-              </Badge>
-            )}
-          </div>
+    {player.isReady ? (
+      <Badge
+        variant="default"
+        className="text-xs bg-primary/10 text-primary border-primary/20"
+      >
+        <CheckCircle2 className="w-3 h-3 mr-1" />
+        Ready
+      </Badge>
+    ) : (
+      <Badge variant="secondary" className="text-xs">
+        <Circle className="w-3 h-3 mr-1" />
+        Not Ready
+      </Badge>
+    )}
+  </div>
 
-          {/* Last Action (for game room) */}
-          {lastAction && (
-            <p className="text-xs text-muted-foreground">{lastAction}</p>
-          )}
-        </div>
+  {lastAction && <p className="text-xs text-muted-foreground">{lastAction}</p>}
+</div>
       </div>
 
       {/* Actions */}

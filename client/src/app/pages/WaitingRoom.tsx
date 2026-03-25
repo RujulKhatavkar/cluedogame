@@ -8,6 +8,7 @@ import { Input } from "../components/ui/input";
 import { ScrollArea } from "../components/ui/scroll-area";
 import { Separator } from "../components/ui/separator";
 import { DetectiveBoard3D } from "../components/game/DetectiveBoard3D";
+import { getSessionId } from "../lib/sessions";
 import {
   Copy,
   Check,
@@ -31,8 +32,9 @@ interface Player {
   isReady: boolean;
   isConnected: boolean;
   eliminated?: boolean;
+  isBot?: boolean;
+  botDifficulty?: string | null;
 }
-
 interface LobbyPayload {
   room: {
     code: string;
@@ -54,6 +56,7 @@ interface Message {
 }
 
 export function WaitingRoom() {
+  const [maxPlayers, setMaxPlayers] = useState<number>(6);
   const { roomCode } = useParams();
   const navigate = useNavigate();
 
@@ -67,6 +70,9 @@ export function WaitingRoom() {
 
   const displayName = sessionStorage.getItem("playerName") || "";
   const avatar = sessionStorage.getItem("playerAvatar") || "detective";
+
+  const humanPlayers = players.filter((p) => !p.isBot).length;
+  const botPlayers = players.filter((p) => p.isBot).length;
 
   useEffect(() => {
     if (!roomCode) return;
@@ -84,6 +90,9 @@ export function WaitingRoom() {
       sessionStorage.setItem("roomCode", String(data.roomCode || roomCode));
       sessionStorage.setItem("roomName", String(data.roomName || ""));
       setRoomName(String(data.roomName || roomName));
+      if (data?.sessionId) {
+      sessionStorage.setItem("sessionId", String(data.sessionId));
+    }
 
       // If host started already, jump to game
       if (data.started) {
@@ -92,12 +101,15 @@ export function WaitingRoom() {
     };
 
     const onLobbyState = (payload: LobbyPayload) => {
+      console.log("LOBBY PAYLOAD:", payload);
+      console.log("PLAYERS FROM SERVER:", payload.players); 
       setRoomName(payload.room?.name || "");
       setPlayers(payload.players || []);
 
       if (payload.room?.started) {
         navigate(`/game/${payload.room.code}`);
       }
+      setMaxPlayers(Number(payload.room?.maxPlayers || 6));
 
       const isHost = payload.room?.hostId === (myPlayerId || socket.id);
       sessionStorage.setItem("isHost", isHost ? "true" : "false");
@@ -135,6 +147,7 @@ export function WaitingRoom() {
       roomCode: String(roomCode).toUpperCase(),
       playerName: displayName,
       playerAvatar: avatar,
+      sessionId: getSessionId(),
     });
 
     return () => {
@@ -174,7 +187,7 @@ export function WaitingRoom() {
   };
 
   const handleToggleReady = () => {
-    if (!roomCode || !currentPlayer) return;
+    if (!roomCode || !currentPlayer || currentPlayer.isBot) return;
     const socket = ensureConnected();
     socket.emit("lobby:ready", {
       roomCode: String(roomCode).toUpperCase(),
@@ -197,6 +210,7 @@ export function WaitingRoom() {
     socket.emit("lobby:chat", { roomCode: String(roomCode).toUpperCase(), text });
     setNewMessage("");
   };
+  
 
   return (
     <div className="min-h-screen p-4 bg-gradient-to-br from-background via-background to-muted/20">
@@ -239,8 +253,11 @@ export function WaitingRoom() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold flex items-center gap-2">
                   <Users className="w-5 h-5 text-primary" />
-                  Players ({players.length}/6)
+                  Players ({players.length}/{maxPlayers})
                 </h2>
+                <div className="mb-4 text-sm text-muted-foreground">
+  Humans: {humanPlayers} • Hard AI Bots: {botPlayers}
+</div>
                 <Badge variant="outline" className="border-primary/50 text-primary">
                   {readyCount} Ready
                 </Badge>
@@ -259,7 +276,7 @@ export function WaitingRoom() {
 
               {players.length < 3 && (
                 <div className="mt-4 p-4 rounded-lg bg-muted/30 border border-border/50">
-                  <p className="text-sm text-muted-foreground">⚠️ Minimum 3 players required to start the game</p>
+                  <p className="text-sm text-muted-foreground"> Bots are always ready. Human players must toggle ready.</p>
                 </div>
               )}
             </Card>
@@ -271,10 +288,11 @@ export function WaitingRoom() {
                   <p className="text-sm text-muted-foreground">Toggle when you're ready to play</p>
                 </div>
                 <Switch
+                
                   checked={!!currentPlayer?.isReady}
                   onCheckedChange={handleToggleReady}
                   className="data-[state=checked]:bg-primary"
-                  disabled={!currentPlayer}
+                  disabled={!currentPlayer || !!currentPlayer.isBot}
                 />
               </div>
             </Card>

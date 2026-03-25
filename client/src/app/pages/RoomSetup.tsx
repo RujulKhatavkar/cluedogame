@@ -24,6 +24,7 @@ import { ensureConnected } from "../lib/socket";
 export function RoomSetup() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [botCount, setBotCount] = useState("0");
 
   const initialMode = searchParams.get("mode") || "create";
   const inviteCode = searchParams.get("code") || "";
@@ -45,6 +46,18 @@ export function RoomSetup() {
   const [roomCode, setRoomCode] = useState(inviteCode);
   const [joinError, setJoinError] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+  
+  useEffect(() => {
+  const maxBots = Math.min(2, Math.max(0, Number(maxPlayers) - 1));
+  if (Number(botCount) > maxBots) {
+    setBotCount(String(maxBots));
+  }
+}, [maxPlayers, botCount]);
+
+const availableBotOptions = useMemo(() => {
+  const maxBots = Math.min(2, Math.max(0, Number(maxPlayers) - 1));
+  return Array.from({ length: maxBots + 1 }, (_, i) => String(i));
+}, [maxPlayers]);
 
   useEffect(() => {
     setActiveTab(initialMode);
@@ -99,16 +112,19 @@ export function RoomSetup() {
       toast.error(err?.message || "Could not create room");
     });
 persistIdentity(displayName.trim(), selectedAvatar);
-
-    socket.emit("room:create", {
-      roomName: roomName.trim(),
-      maxPlayers: Number(maxPlayers),
-      isPrivate,
-      playerName: displayName.trim(),
-      playerAvatar: selectedAvatar,
-        sessionId: getSessionId()
-
-    });
+console.log("creating room with", {
+  maxPlayers: Number(maxPlayers),
+  botCount: Number(botCount),
+});
+socket.emit("room:create", {
+  roomName: roomName.trim(),
+  maxPlayers: Number(maxPlayers),
+  botCount: Number(botCount),
+  isPrivate,
+  playerName: displayName.trim(),
+  playerAvatar: selectedAvatar,
+  sessionId: getSessionId(),
+});
   };
 
   const handleCopyCode = () => {
@@ -127,55 +143,48 @@ persistIdentity(displayName.trim(), selectedAvatar);
   };
 
   const handleJoinRoom = () => {
-    if (!displayName.trim()) return toast.error("Please enter your display name");
-    if (!roomCode.trim()) {
-      setJoinError("Please enter a room code");
-      return;
-    }
+  if (!displayName.trim()) return toast.error("Please enter your display name");
+  if (!roomCode.trim()) {
+    setJoinError("Please enter a room code");
+    return;
+  }
 
-    const socket = ensureConnected();
+  const socket = ensureConnected();
+  const normalized = roomCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
-    setIsJoining(true);
-    setJoinError("");
+  setIsJoining(true);
+  setJoinError("");
 
-    socket.off("room:joined");
-    socket.off("room:error");
+  socket.off("room:joined");
+  socket.off("room:error");
 
-    socket.once("room:joined", (data: any) => {
-      setIsJoining(false);
-      const code = String(data.roomCode || roomCode).toUpperCase();
-      persistPlayer(false, String(data.playerId || socket.id));
-      sessionStorage.setItem("roomCode", code);
-      sessionStorage.setItem("roomName", String(data.roomName || ""));
-      toast.success("Joined room successfully!");
-      navigate(`/lobby/${code}`);
-    });
+  socket.once("room:joined", (data: any) => {
+    setIsJoining(false);
+    const code = String(data.roomCode || normalized).toUpperCase();
+    if (data?.sessionId) sessionStorage.setItem("sessionId", String(data.sessionId));
+    persistPlayer(false, String(data.playerId || socket.id));
+    sessionStorage.setItem("roomCode", code);
+    sessionStorage.setItem("roomName", String(data.roomName || ""));
+    toast.success("Joined room successfully!");
+    navigate(`/lobby/${code}`);
+  });
 
-    socket.once("room:error", (err: any) => {
-      setIsJoining(false);
-      const msg = err?.message || "Could not join room";
-      setJoinError(msg);
-      toast.error(msg);
-        const normalized = roomCode.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  socket.once("room:error", (err: any) => {
+    setIsJoining(false);
+    const msg = err?.message || "Could not join room";
+    setJoinError(msg);
+    toast.error(msg);
+  });
 
-    socket.emit("room:join", {
-      roomCode: normalized,
-      playerName: displayName.trim(),
-      playerAvatar: selectedAvatar,
-      sessionId: getSessionId(),
-    });
-    });
+  persistIdentity(displayName.trim(), selectedAvatar);
 
-persistIdentity(displayName.trim(), selectedAvatar);
-
-socket.emit("room:join", {
-  roomCode: inviteCode.toUpperCase(),
-  playerName: displayName.trim(),
-  playerAvatar: selectedAvatar,
-  sessionId: getSessionId(),
-});
-  };
-
+  socket.emit("room:join", {
+    roomCode: normalized,
+    playerName: displayName.trim(),
+    playerAvatar: selectedAvatar,
+    sessionId: getSessionId(),
+  });
+};
   const handleGoToLobby = () => {
     if (!generatedRoomCode) return;
     navigate(`/lobby/${generatedRoomCode}`);
@@ -244,31 +253,48 @@ socket.emit("room:join", {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Max Players</Label>
-                      <Select value={maxPlayers} onValueChange={setMaxPlayers} disabled={!!generatedRoomCode}>
-                        <SelectTrigger className="bg-input-background">
-                          <SelectValue placeholder="Select" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {["3", "4", "5", "6"].map((n) => (
-                            <SelectItem key={n} value={n}>
-                              {n} Players
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                 <div className="grid grid-cols-2 gap-4">
+  <div className="space-y-2">
+    <Label>Total Players</Label>
+    <Select
+      value={maxPlayers}
+      onValueChange={setMaxPlayers}
+      disabled={!!generatedRoomCode}
+    >
+      <SelectTrigger className="bg-input-background">
+        <SelectValue placeholder="Select" />
+      </SelectTrigger>
+      <SelectContent>
+        {["3", "4", "5", "6"].map((n) => (
+          <SelectItem key={n} value={n}>
+            {n} Total Players
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
 
-                    <div className="flex items-end justify-between rounded-lg border border-border/50 p-3 bg-muted/20">
-                      <div>
-                        <Label>Private Room</Label>
-                        <p className="text-xs text-muted-foreground">Invite-only</p>
-                      </div>
-                      <Switch checked={isPrivate} onCheckedChange={setIsPrivate} disabled={!!generatedRoomCode} />
-                    </div>
-                  </div>
+  <div className="space-y-2">
+    <Label>Hard AI Bots</Label>
+    <Select
+      value={botCount}
+      onValueChange={setBotCount}
+      disabled={!!generatedRoomCode}
+    >
+      <SelectTrigger className="bg-input-background">
+        <SelectValue placeholder="Select" />
+      </SelectTrigger>
+      <SelectContent>
+        {availableBotOptions.map((n) => (
+          <SelectItem key={n} value={n}>
+            {n} Bot{n === "1" ? "" : "s"}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+    
+  </div>
+</div>
 
                   {!generatedRoomCode ? (
                     <Button
