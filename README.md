@@ -2,6 +2,9 @@
 
 Play with your friends at https://cluedogame.onrender.com/ (please allow a few minutes for the server to load).”
 
+<img width="2938" height="1590" alt="image" src="https://github.com/user-attachments/assets/3034d497-dca3-45d4-965c-2b9910693cd9" />
+
+
 This is a merged project:
 - **Frontend**: from *Multiplayer Deduction Game* (Vite + React + shadcn UI)
 - **Backend**: rebuilt from *cluedogame-main*, upgraded with:
