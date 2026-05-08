@@ -1,5 +1,7 @@
 # ClueFinder — Multiplayer Deduction Game (Full Stack)
 
+Play with your friends at https://cluedogame.onrender.com/ (please allow a few minutes for the server to load).”
+
 This is a merged project:
 - **Frontend**: from *Multiplayer Deduction Game* (Vite + React + shadcn UI)
 - **Backend**: rebuilt from *cluedogame-main*, upgraded with:
