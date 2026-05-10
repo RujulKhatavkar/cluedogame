@@ -63,7 +63,15 @@ const roomsList = [
 
 const ALL_CARDS = [...suspects, ...weapons, ...roomsList];
 const SOLUTION_OWNER = '__solution__';
-const BOT_THINK_MS = 650;
+// Bot "thinking" time before a bot fires its ask or shows a card.
+// Longer values give players time to read the previous action.
+const BOT_THINK_MS = 5000;
+// Pause after a suggestion is broadcast before the first player is prompted
+// to show a card. Lets everyone read "X asks: Plum / Knife / Library" first.
+const POST_ASSUMPTION_PAUSE_MS = 5000;
+// Pause after an ask is fully resolved (card shown or no-one had one)
+// before the next player's turn begins. Avoids snap transitions in AI mode.
+const TURN_TRANSITION_MS = 5000;
 const BOT_AVATARS = ['detective', 'professor', 'colonel', 'doctor', 'mr', 'mrs', 'reverend', 'miss'];
 
 const rooms = Object.create(null);
@@ -110,6 +118,33 @@ function clearBotTimer(room) {
     clearTimeout(room.state.botTimer);
     room.state.botTimer = null;
   }
+}
+
+// Schedule the transition to the next player's turn AFTER an ask resolves.
+// This is the main pacing fix for AI mode — instead of snap-flipping to the
+// next bot, we let the "card shown" / "no one had it" event sit for a moment.
+function scheduleTurnTransition(room) {
+  if (!room || room.ended) return;
+  clearBotTimer(room);
+  room.state.botTimer = setTimeout(() => {
+    const liveRoom = getRoom(room.code);
+    if (!liveRoom || liveRoom.ended) return;
+    liveRoom.state.botTimer = null;
+    emitTurn(liveRoom);
+  }, TURN_TRANSITION_MS);
+}
+
+// Schedule prompting the first responder after a suggestion is broadcast.
+// Gives players time to register "what did they ask?" before being prompted.
+function schedulePromptNext(room) {
+  if (!room || room.ended) return;
+  clearBotTimer(room);
+  room.state.botTimer = setTimeout(() => {
+    const liveRoom = getRoom(room.code);
+    if (!liveRoom || liveRoom.ended || !liveRoom.state.currentAsk) return;
+    liveRoom.state.botTimer = null;
+    promptNext(liveRoom);
+  }, POST_ASSUMPTION_PAUSE_MS);
 }
 
 function generateRoomCode() {
@@ -597,7 +632,7 @@ function promptNext(room) {
 
     room.state.currentAsk = null;
     room.state.turnIndex = nextActiveTurnIndex(room, room.state.turnIndex);
-    emitTurn(room);
+    scheduleTurnTransition(room);
     return;
   }
 
@@ -674,11 +709,11 @@ function startAsk(room, asker, assumption, targetId = null) {
 
     st.currentAsk = null;
     st.turnIndex = nextActiveTurnIndex(room, st.turnIndex);
-    emitTurn(room);
+    scheduleTurnTransition(room);
     return;
   }
 
-  promptNext(room);
+  schedulePromptNext(room);
 }
 
 function executeBotShowCard(roomCode, botId) {
@@ -721,7 +756,7 @@ function executeBotShowCard(roomCode, botId) {
 
   room.state.currentAsk = null;
   room.state.turnIndex = nextActiveTurnIndex(room, room.state.turnIndex);
-  emitTurn(room);
+  scheduleTurnTransition(room);
 }
 
 function endGameWithWinner(room, winnerPlayer, solutionOverride = null) {
@@ -1261,7 +1296,7 @@ console.log(
 
       room.state.currentAsk = null;
       room.state.turnIndex = nextActiveTurnIndex(room, room.state.turnIndex);
-      emitTurn(room);
+      scheduleTurnTransition(room);
       return;
     }
 
